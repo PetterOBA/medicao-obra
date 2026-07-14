@@ -408,7 +408,7 @@
 <script>
 // ─── CONFIGURAÇÃO ───────────────────────────────────────────
 // Cole aqui a URL gerada no Google Apps Script após o deploy
-const URL_SCRIPT = "COLE_SUA_URL_AQUI";
+const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyC25ygyRM5pv-JqGQWrbNE7T06O4mAYG_2ahOu2EsyKwQe94FZVmEHULZWi0Uyxk0/exec";
 
 const TOTAL = 72;
 
@@ -509,12 +509,10 @@ async function carregar() {
   renderGrid();
 }
 
-async function apiPost(body) {
-  const r = await fetch(URL_SCRIPT, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain" },
-    body: JSON.stringify(body)
-  });
+async function apiCall(params) {
+  const url = new URL(URL_SCRIPT);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v ?? ""));
+  const r = await fetch(url.toString());
   return r.json();
 }
 
@@ -740,7 +738,7 @@ async function salvar() {
   };
 
   try {
-    const res = await apiPost({ action: "add", ...reg });
+    const res = await apiCall({ action: "add", ...reg });
     if (res.success) {
       reg.ID = res.id;
       registros.push(reg);
@@ -774,7 +772,7 @@ async function confirmarConclusao() {
   if (!data) { toast("Informe a data de conclusão"); return; }
 
   try {
-    const res = await apiPost({ action: "update", id: idParaConcluir, dataConclusao: data });
+    const res = await apiCall({ action: "update", id: idParaConcluir, dataConclusao: data });
     if (res.success) {
       const reg = registros.find(r => String(r.ID) === String(idParaConcluir));
       if (reg) reg.DataConclusao = data;
