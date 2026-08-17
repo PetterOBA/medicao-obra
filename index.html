@@ -1,884 +1,568 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Medição de Obra</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Medição de Obra — SUMMUS</title>
+<style>
+  :root{
+    --navy:#0a1338;
+    --navy2:#0c1fa0;
+    --gold:#c9a227;
+    --bg:#f2f3f6;
+    --card:#ffffff;
+    --line:#e4e6ee;
+    --txt:#171b2e;
+    --txt2:#5c6377;
+    --txt3:#9298a8;
+    --gray:#a3aab8;
+    --grayBg:#eef0f4;
+    --amber:#e5940f;
+    --amberBg:#fdf1dc;
+    --green:#1a9e5c;
+    --greenBg:#e2f6ea;
+    --danger:#d43f3f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--txt);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior-y:none;
+  }
+  button{font-family:inherit;}
+  .app{max-width:560px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;}
 
-    :root {
-      --azul:       #1a2940;
-      --azul2:      #2d4a6e;
-      --laranja:    #e07b20;
-      --verde:      #16a34a;
-      --verde-bg:   #dcfce7;
-      --amarelo:    #d97706;
-      --amarelo-bg: #fef9c3;
-      --cinza:      #9ca3af;
-      --cinza-bg:   #e5e7eb;
-      --bg:         #f1f3f6;
-      --branco:     #ffffff;
-      --texto:      #111827;
-      --texto2:     #6b7280;
-    }
+  /* header */
+  header{
+    background:linear-gradient(135deg,var(--navy),var(--navy2));
+    color:#fff;padding:16px 18px 14px;
+    position:sticky;top:0;z-index:20;
+    border-bottom:3px solid var(--gold);
+  }
+  .brandrow{display:flex;align-items:center;justify-content:space-between;}
+  .brand{font-weight:800;letter-spacing:.06em;font-size:15px;}
+  .brand small{display:block;font-weight:500;letter-spacing:.14em;font-size:9px;color:var(--gold);margin-top:1px;}
+  .hbtn{background:rgba(255,255,255,.12);border:none;color:#fff;width:34px;height:34px;border-radius:9px;font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .hbtn:active{background:rgba(255,255,255,.22);}
+  .htitle{font-size:18px;font-weight:700;margin-top:2px;}
+  .hsub{font-size:12.5px;color:#c7cdea;margin-top:2px;}
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      min-height: 100vh;
-      max-width: 480px;
-      margin: 0 auto;
-      position: relative;
-    }
+  /* screens */
+  .screen{display:none;flex:1;flex-direction:column;}
+  .screen.active{display:flex;}
 
-    /* ── HEADER ─────────────────────────────────── */
-    .header {
-      background: var(--azul);
-      color: #fff;
-      padding: 13px 16px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .header-info { flex: 1; min-width: 0; }
-    .header h1 { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .header p  { font-size: 11px; opacity: 0.55; margin-top: 2px; }
-    .btn-back {
-      background: rgba(255,255,255,.12);
-      border: none; color: #fff;
-      width: 34px; height: 34px;
-      border-radius: 8px; font-size: 18px;
-      cursor: pointer; display: flex;
-      align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
+  /* home screen */
+  .home{padding:22px 18px 40px;gap:14px;display:flex;flex-direction:column;}
+  .home-hint{color:var(--txt2);font-size:13.5px;margin-bottom:2px;}
+  .projcard{
+    background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:18px 18px;display:flex;align-items:center;justify-content:space-between;
+    cursor:pointer;transition:transform .1s;
+  }
+  .projcard:active{transform:scale(.98);background:#fafaff;}
+  .projcard .pname{font-weight:700;font-size:16px;color:var(--navy);}
+  .projcard .pmeta{font-size:12.5px;color:var(--txt2);margin-top:3px;}
+  .projcard .parrow{font-size:20px;color:var(--gold);}
+  .projprog{display:flex;align-items:center;gap:7px;margin-top:9px;}
+  .projprog .bar{flex:1;height:6px;background:var(--grayBg);border-radius:4px;overflow:hidden;}
+  .projprog .bar i{display:block;height:100%;background:var(--green);border-radius:4px;}
+  .projprog .pct{font-size:11.5px;color:var(--txt2);font-weight:600;min-width:32px;text-align:right;}
 
-    /* ── TELAS ───────────────────────────────────── */
-    .tela { display: none; padding-bottom: 76px; }
-    .tela.ativa { display: block; }
+  /* grid screen */
+  .gridwrap{padding:14px 16px 30px;flex:1;}
+  .searchrow{display:flex;gap:8px;margin-bottom:14px;}
+  .searchrow input{
+    flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+    font-size:14px;background:var(--card);
+  }
+  .searchrow input:focus{outline:2px solid var(--navy2);}
+  .legend{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+  .legend span{font-size:11.5px;color:var(--txt2);display:flex;align-items:center;gap:5px;}
+  .legend i{width:9px;height:9px;border-radius:3px;display:block;}
+  .unitgrid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;
+  }
+  .unit{
+    aspect-ratio:1;border-radius:10px;border:1px solid var(--line);
+    background:var(--grayBg);color:var(--txt);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:14px;cursor:pointer;position:relative;
+  }
+  .unit:active{transform:scale(.93);}
+  .unit.andamento{background:var(--amberBg);color:#8a5a06;border-color:#f0cf94;}
+  .unit.concluido{background:var(--greenBg);color:#0d6b3c;border-color:#a6e2c1;}
 
-    /* ── GRID ────────────────────────────────────── */
-    .legenda {
-      display: flex; gap: 14px; flex-wrap: wrap;
-      padding: 10px 16px;
-      background: var(--branco);
-      border-bottom: 1px solid var(--cinza-bg);
-    }
-    .leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--texto2); }
-    .leg-dot { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+  /* detail screen */
+  .detailhead{padding:14px 16px 10px;}
+  .unitbig{font-size:20px;font-weight:800;color:var(--navy);}
+  .unitprog{display:flex;align-items:center;gap:8px;margin-top:8px;}
+  .unitprog .bar{flex:1;height:7px;background:var(--grayBg);border-radius:4px;overflow:hidden;}
+  .unitprog .bar i{display:block;height:100%;border-radius:4px;background:var(--green);}
+  .unitprog .pct{font-size:12px;color:var(--txt2);font-weight:700;min-width:34px;text-align:right;}
+  .stagelist{padding:6px 16px 40px;display:flex;flex-direction:column;gap:9px;}
+  .stage{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;}
+  .stagehead{display:flex;align-items:center;padding:12px 13px;gap:10px;cursor:pointer;}
+  .stagename{flex:1;font-size:14.5px;font-weight:600;}
+  .stagesub{font-size:11.5px;color:var(--txt3);margin-top:1px;font-weight:400;}
+  .pill{
+    font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:20px;
+    background:var(--grayBg);color:var(--txt2);white-space:nowrap;
+    display:flex;align-items:center;gap:5px;border:none;cursor:pointer;
+  }
+  .pill.andamento{background:var(--amberBg);color:#8a5a06;}
+  .pill.concluido{background:var(--greenBg);color:#0d6b3c;}
+  .chev{color:var(--txt3);font-size:12px;transition:transform .15s;padding:4px;}
+  .stage.open .chev{transform:rotate(90deg);}
+  .substuff{display:none;border-top:1px solid var(--line);}
+  .stage.open .substuff{display:block;}
+  .subrow{display:flex;align-items:center;padding:10px 13px 10px 24px;gap:10px;border-top:1px solid #f0f1f5;}
+  .subrow:first-child{border-top:none;}
+  .subname{flex:1;font-size:13.5px;color:var(--txt);}
+  .cascaderow{display:flex;gap:8px;padding:8px 13px 12px 24px;border-top:1px solid #f0f1f5;}
+  .cascadebtn{
+    flex:1;border:1px solid var(--line);background:var(--bg);color:var(--txt2);
+    border-radius:9px;padding:8px 6px;font-size:12px;font-weight:600;cursor:pointer;
+  }
+  .cascadebtn.ok{color:#0d6b3c;border-color:#a6e2c1;background:var(--greenBg);}
+  .cascadebtn.reset{color:var(--danger);}
+  .cascadebtn:active{opacity:.7;}
 
-    .contadores {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 8px; padding: 12px 16px 4px;
-    }
-    .contador {
-      background: var(--branco); border-radius: 10px;
-      padding: 10px 8px; text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,.06);
-    }
-    .contador .num { font-size: 22px; font-weight: 800; line-height: 1; }
-    .contador .lbl { font-size: 10px; color: var(--texto2); margin-top: 3px; }
+  /* toast */
+  .toast{
+    position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);
+    background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;
+    opacity:0;pointer-events:none;transition:all .25s;z-index:100;font-weight:600;
+    display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.err{background:var(--danger);}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0;}
+  .dot.spin{animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
-    .grid-wrap { padding: 10px 16px 0; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
-      gap: 6px;
-    }
-    .casa {
-      aspect-ratio: 1;
-      border-radius: 7px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 10px; font-weight: 700;
-      cursor: pointer; border: none;
-      transition: transform .1s;
-    }
-    .casa:active { transform: scale(.85); }
-    .casa.sem      { background: var(--cinza-bg);   color: var(--cinza); }
-    .casa.andamento{ background: var(--amarelo-bg);  color: var(--amarelo); }
-    .casa.concluida{ background: var(--verde-bg);    color: var(--verde); }
-
-    /* ── UNIDADE ─────────────────────────────────── */
-    .unidade-wrap { padding: 14px 16px; }
-
-    .btn-nova {
-      width: 100%; background: var(--laranja); color: #fff;
-      border: none; padding: 14px; border-radius: 10px;
-      font-size: 15px; font-weight: 700; cursor: pointer;
-      margin-bottom: 14px; letter-spacing: .2px;
-    }
-
-    .card {
-      background: var(--branco); border-radius: 10px;
-      padding: 14px; margin-bottom: 10px;
-      box-shadow: 0 1px 3px rgba(0,0,0,.07);
-    }
-    .card-bread { font-size: 11px; color: var(--texto2); margin-bottom: 3px; }
-    .card-nome  { font-size: 15px; font-weight: 700; color: var(--texto); margin-bottom: 10px; }
-    .card-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .card-field label { display: block; font-size: 10px; color: var(--cinza); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
-    .card-field span  { font-size: 13px; font-weight: 600; color: var(--texto); }
-    .card-field.full  { grid-column: 1/-1; }
-
-    .badge {
-      display: inline-block; padding: 2px 9px;
-      border-radius: 999px; font-size: 11px; font-weight: 600;
-    }
-    .badge-and { background: var(--amarelo-bg); color: #92400e; }
-    .badge-ok  { background: var(--verde-bg);   color: #166534; }
-
-    .btn-concluir {
-      width: 100%; margin-top: 10px;
-      background: #f0fdf4; border: 1px solid #86efac;
-      color: var(--verde); padding: 10px; border-radius: 8px;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-    }
-
-    .empty {
-      text-align: center; padding: 44px 20px; color: var(--cinza);
-    }
-    .empty .icon { font-size: 42px; margin-bottom: 10px; }
-    .empty p { font-size: 14px; line-height: 1.5; }
-
-    /* ── FORMULÁRIO ──────────────────────────────── */
-    .form-wrap { padding: 16px; }
-    .campo { margin-bottom: 16px; }
-    .campo > label {
-      display: block; font-size: 13px; font-weight: 600;
-      color: #374151; margin-bottom: 6px;
-    }
-    .opc { font-weight: 400; color: var(--cinza); font-size: 11px; }
-    .campo select,
-    .campo input[type="date"],
-    .campo input[type="text"] {
-      width: 100%; padding: 12px 14px;
-      border: 1.5px solid var(--cinza-bg);
-      border-radius: 8px; font-size: 15px;
-      background: var(--branco); color: var(--texto);
-      appearance: auto; -webkit-appearance: auto; outline: none;
-    }
-    .campo select:focus,
-    .campo input:focus { border-color: var(--azul); }
-    .campo select:disabled { background: #f9fafb; color: var(--cinza); }
-
-    .btn-salvar {
-      width: 100%; background: var(--azul); color: #fff;
-      border: none; padding: 14px; border-radius: 10px;
-      font-size: 16px; font-weight: 700; cursor: pointer;
-      transition: background .15s;
-    }
-    .btn-salvar:disabled { background: var(--cinza-bg); color: var(--cinza); cursor: not-allowed; }
-
-    /* ── ADMIN ───────────────────────────────────── */
-    .admin-wrap { padding: 14px 16px; }
-    .sec-title { font-size: 11px; font-weight: 700; color: var(--texto2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
-    .export-row { display: flex; gap: 8px; margin-bottom: 20px; }
-    .btn-exp {
-      flex: 1; padding: 12px; border-radius: 8px;
-      font-size: 14px; font-weight: 700; cursor: pointer;
-      text-align: center;
-    }
-    .btn-xlsx { background: #166534; border: none; color: #fff; }
-    .btn-csv  { background: var(--branco); border: 1.5px solid var(--azul); color: var(--azul); }
-
-    .resumo-card {
-      background: var(--branco); border-radius: 10px;
-      padding: 13px 14px; margin-bottom: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,.06);
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .resumo-macro { font-weight: 700; font-size: 14px; color: var(--texto); }
-    .resumo-sub   { font-size: 12px; color: var(--texto2); margin-top: 2px; }
-    .resumo-pct   { font-size: 20px; font-weight: 800; }
-
-    /* ── BOTTOM NAV ──────────────────────────────── */
-    .bottom-nav {
-      position: fixed; bottom: 0;
-      left: 50%; transform: translateX(-50%);
-      width: 100%; max-width: 480px;
-      background: var(--branco);
-      border-top: 1px solid var(--cinza-bg);
-      display: flex; z-index: 200;
-    }
-    .nav-btn {
-      flex: 1; padding: 10px 8px 12px;
-      border: none; background: none;
-      font-size: 11px; color: var(--cinza);
-      cursor: pointer;
-      display: flex; flex-direction: column; align-items: center; gap: 3px;
-      transition: color .15s;
-    }
-    .nav-btn.ativo { color: var(--azul); font-weight: 700; }
-    .nav-icon { font-size: 22px; line-height: 1; }
-
-    /* ── MODAL ───────────────────────────────────── */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,.45); z-index: 300;
-      align-items: flex-end; justify-content: center;
-    }
-    .modal-overlay.show { display: flex; }
-    .modal {
-      background: var(--branco); width: 100%; max-width: 480px;
-      border-radius: 16px 16px 0 0; padding: 20px 16px 36px;
-    }
-    .modal-handle { width: 36px; height: 4px; background: var(--cinza-bg); border-radius: 999px; margin: 0 auto 16px; }
-    .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 14px; }
-    .btn-confirmar { width: 100%; background: var(--verde); border: none; color: #fff; padding: 13px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; }
-    .btn-cancelar  { width: 100%; background: none; border: none; color: var(--texto2); padding: 10px; font-size: 14px; cursor: pointer; margin-top: 6px; }
-
-    /* ── TOAST ───────────────────────────────────── */
-    .toast {
-      position: fixed; bottom: 86px;
-      left: 50%; transform: translateX(-50%);
-      background: #111827; color: #fff;
-      padding: 11px 22px; border-radius: 999px;
-      font-size: 14px; font-weight: 600;
-      z-index: 999; opacity: 0;
-      transition: opacity .25s; pointer-events: none;
-      white-space: nowrap;
-    }
-    .toast.show { opacity: 1; }
-
-    /* ── LOADING ─────────────────────────────────── */
-    .spinner-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 14px; color: var(--texto2); font-size: 14px; }
-    .spinner { width: 30px; height: 30px; border: 3px solid var(--cinza-bg); border-top-color: var(--azul); border-radius: 50%; animation: spin .7s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+  .loading{padding:40px 20px;text-align:center;color:var(--txt2);font-size:13.5px;}
+  .empty{padding:40px 20px;text-align:center;color:var(--txt3);font-size:13px;}
+</style>
 </head>
 <body>
+<div class="app">
 
-<!-- ═══════════════════════════════════════
-     TELA 1 — GRID
-═════════════════════════════════════════ -->
-<div id="tela-grid" class="tela ativa">
-  <div class="header">
-    <div class="header-info">
-      <h1>Supremo Goiânia</h1>
-      <p id="grid-sub">Carregando...</p>
+  <header>
+    <div class="brandrow">
+      <div class="brand">SUMMUS<small>ENGENHARIA</small></div>
+      <button class="hbtn" id="btnBack" style="display:none;" aria-label="Voltar">←</button>
+    </div>
+    <div id="headTitle" class="htitle">Medição de Obra</div>
+    <div id="headSub" class="hsub">Selecione o empreendimento</div>
+  </header>
+
+  <!-- HOME -->
+  <div class="screen active" id="screen-home">
+    <div class="home">
+      <div class="home-hint">Toque num empreendimento pra lançar o andamento das unidades.</div>
+      <div id="homeCards"></div>
     </div>
   </div>
 
-  <div class="legenda">
-    <div class="leg"><div class="leg-dot" style="background:var(--cinza-bg)"></div>Sem registro</div>
-    <div class="leg"><div class="leg-dot" style="background:var(--amarelo-bg)"></div>Em andamento</div>
-    <div class="leg"><div class="leg-dot" style="background:var(--verde-bg)"></div>Concluída</div>
+  <!-- GRID -->
+  <div class="screen" id="screen-grid">
+    <div class="gridwrap">
+      <div class="searchrow">
+        <input type="number" inputmode="numeric" id="searchUnit" placeholder="Ir direto pra unidade nº...">
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--gray)"></i>Não iniciado</span>
+        <span><i style="background:var(--amber)"></i>Em andamento</span>
+        <span><i style="background:var(--green)"></i>Concluído</span>
+      </div>
+      <div id="unitGrid" class="unitgrid"></div>
+      <div id="gridLoading" class="loading" style="display:none;">Carregando status das unidades...</div>
+    </div>
   </div>
 
-  <div class="contadores">
-    <div class="contador"><div class="num" id="cnt-sem" style="color:var(--cinza)">–</div><div class="lbl">Sem registro</div></div>
-    <div class="contador"><div class="num" id="cnt-and" style="color:var(--amarelo)">–</div><div class="lbl">Em andamento</div></div>
-    <div class="contador"><div class="num" id="cnt-ok"  style="color:var(--verde)">–</div><div class="lbl">Concluídas</div></div>
+  <!-- DETAIL -->
+  <div class="screen" id="screen-detail">
+    <div class="detailhead">
+      <div class="unitbig" id="unitTitle">Casa 1</div>
+      <div class="unitprog"><div class="bar"><i id="unitBar" style="width:0%"></i></div><div class="pct" id="unitPct">0%</div></div>
+    </div>
+    <div class="stagelist" id="stageList"></div>
   </div>
 
-  <div class="grid-wrap">
-    <div class="grid" id="grid"></div>
-  </div>
 </div>
 
-<!-- ═══════════════════════════════════════
-     TELA 2 — UNIDADE
-═════════════════════════════════════════ -->
-<div id="tela-unidade" class="tela">
-  <div class="header">
-    <button class="btn-back" onclick="voltarGrid()">←</button>
-    <div class="header-info">
-      <h1 id="uni-titulo">Casa 01</h1>
-      <p  id="uni-sub">0 etapas registradas</p>
-    </div>
-  </div>
-  <div class="unidade-wrap">
-    <button class="btn-nova" onclick="irForm()">＋ Nova Etapa</button>
-    <div id="lista-etapas"></div>
-  </div>
-</div>
+<div class="toast" id="toast"><span class="dot" id="toastDot"></span><span id="toastMsg">Salvo</span></div>
 
-<!-- ═══════════════════════════════════════
-     TELA 3 — FORMULÁRIO
-═════════════════════════════════════════ -->
-<div id="tela-form" class="tela">
-  <div class="header">
-    <button class="btn-back" onclick="voltarUnidade()">←</button>
-    <div class="header-info">
-      <h1 id="form-titulo">Nova Etapa</h1>
-      <p  id="form-sub">–</p>
-    </div>
-  </div>
-  <div class="form-wrap">
-
-    <div class="campo">
-      <label>Macro Etapa <span class="opc">*</span></label>
-      <select id="sel-macro" onchange="onMacro()">
-        <option value="">Selecione...</option>
-      </select>
-    </div>
-
-    <div class="campo" id="campo-sub" style="display:none">
-      <label>Sub Etapa <span class="opc">*</span></label>
-      <select id="sel-sub" onchange="onSub()">
-        <option value="">Selecione...</option>
-      </select>
-    </div>
-
-    <div class="campo">
-      <label>Tarefa <span class="opc">*</span></label>
-      <select id="sel-tarefa" disabled onchange="validar()">
-        <option value="">Selecione a macro etapa primeiro</option>
-      </select>
-    </div>
-
-    <div class="campo">
-      <label>Data de Início <span class="opc">*</span></label>
-      <input type="date" id="inp-inicio" onchange="validar()">
-    </div>
-
-    <div class="campo">
-      <label>Equipe <span class="opc">*</span></label>
-      <input type="text" id="inp-equipe" placeholder="Ex: Equipe A, João..." oninput="validar()">
-    </div>
-
-    <div class="campo">
-      <label>Data de Conclusão <span class="opc">(opcional)</span></label>
-      <input type="date" id="inp-conclusao">
-    </div>
-
-    <button class="btn-salvar" id="btn-salvar" onclick="salvar()" disabled>Salvar Etapa</button>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════
-     TELA 4 — ADMIN
-═════════════════════════════════════════ -->
-<div id="tela-admin" class="tela">
-  <div class="header">
-    <div class="header-info">
-      <h1>Administrativo</h1>
-      <p id="admin-sub">Visão geral da obra</p>
-    </div>
-  </div>
-  <div class="admin-wrap">
-    <p class="sec-title">Exportar</p>
-    <div class="export-row">
-      <button class="btn-exp btn-xlsx" onclick="exportXLSX()">⬇ Excel</button>
-      <button class="btn-exp btn-csv"  onclick="exportCSV()">⬇ CSV</button>
-    </div>
-    <p class="sec-title">Progresso por macro etapa</p>
-    <div id="admin-resumo"></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════
-     MODAL — REGISTRAR CONCLUSÃO
-═════════════════════════════════════════ -->
-<div class="modal-overlay" id="modal" onclick="if(event.target===this)fecharModal()">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <h3 id="modal-titulo">Registrar Conclusão</h3>
-    <div class="campo">
-      <label>Data de Conclusão <span class="opc">*</span></label>
-      <input type="date" id="inp-modal-data">
-    </div>
-    <button class="btn-confirmar" onclick="confirmarConclusao()">✓ Confirmar</button>
-    <button class="btn-cancelar"  onclick="fecharModal()">Cancelar</button>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════
-     BOTTOM NAV
-═════════════════════════════════════════ -->
-<nav class="bottom-nav">
-  <button class="nav-btn ativo" id="nav-obra"  onclick="navObra()">
-    <span class="nav-icon">🏗</span>Obra
-  </button>
-  <button class="nav-btn"        id="nav-admin" onclick="navAdmin()">
-    <span class="nav-icon">📊</span>Admin
-  </button>
-</nav>
-
-<div id="toast" class="toast"></div>
-
-<!-- ═══════════════════════════════════════
-     SCRIPT
-═════════════════════════════════════════ -->
 <script>
-// ─── CONFIGURAÇÃO ───────────────────────────────────────────
-// Cole aqui a URL gerada no Google Apps Script após o deploy
-const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyC25ygyRM5pv-JqGQWrbNE7T06O4mAYG_2ahOu2EsyKwQe94FZVmEHULZWi0Uyxk0/exec";
+/* ======================= CONFIG ======================= */
+const URL_SCRIPT = https://script.google.com/macros/s/AKfycbyqJDYbqxZG1B86X_bIsRtmRb7W-J-jcPF-n1apeEuBdWPsI3F-_WYcPG6I39u-HPNK/exec
 
-const TOTAL = 72;
-
-// ─── ETAPAS DA OBRA ─────────────────────────────────────────
-const ETAPAS = {
-  "Radier": {
-    subs: null,
-    tarefas: ["Colocação de forma metálica","Escavação de Blocos","Infra-elétrica","Infra-esgoto","Lastro de brita e lona","Armação","Concretagem"]
-  },
-  "Estrutura": {
-    subs: {
-      "Pavimento Térreo":   ["Armação de Pilares","Fechamento de formas e pilares","Concretagem dos pilares","Fechamento de forma de vigas e lajes + Escada","Armação de vigas e lajes + Escada","Concretagem de vigas e lajes + Escada","Desforma","Retirar as Escoras"],
-      "Pavimento Superior": ["Armação de Pilares","Fechamento de formas e pilares","Concretagem dos pilares","Fechamento de forma de vigas e lajes","Armação de vigas e lajes","Concretagem de vigas e lajes","Desforma","Retirar as Escoras"]
-    }
-  },
-  "Alvenaria": {
-    subs: {
-      "Pavimento Térreo":   ["Marcação de alvenaria","Elevação de alvenaria - blocos","Encunhamento","Tratamento de juntas"],
-      "Pavimento Superior": ["Marcação de alvenaria","Elevação de alvenaria - blocos","Encunhamento","Tratamento de juntas"]
-    }
-  },
-  "Contrapiso": {
-    subs: null,
-    tarefas: ["Regularização","Impermeabilização de banheiro","Impermeabilização de laje","Proteção mecânica de laje"]
-  },
-  "Infra-Elétrica": {
-    subs: null,
-    tarefas: ["Tubulação e caixa embutida","Enfiação","Fechamento de quadros","Infra energia solar"]
-  },
-  "Instalações Hidráulicas": {
-    subs: null,
-    tarefas: ["Água fria e quente","Fechamento de tubulações Aéreas","Drenos de AC"]
-  },
-  "Gesso": {
-    subs: null,
-    tarefas: ["Tabica","Gesso em placa","Gesso corrido","Glassrock fachada"]
-  },
-  "Esquadrias Metálicas": {
-    subs: null,
-    tarefas: ["Peitoril","Janelas","Pele de vidro","Guarda Corpo"]
-  },
-  "Revestimento Cerâmico": {
-    subs: null,
-    tarefas: ["Parede","Piso","Revestimento de Pedras naturais","Soleiras","Rejuntamento"]
-  },
-  "Bancadas": {
-    subs: null,
-    tarefas: ["Banheiro","Cozinha","Lavabo","Escada de Granito"]
-  },
-  "Pintura Interna": {
-    subs: null,
-    tarefas: ["Emassamento","1º demão pintura","2º demão pintura"]
-  },
-  "Esquadrias": {
-    subs: null,
-    tarefas: ["Portas de madeira","Esquadrias metálicas"]
-  },
-  "Pintura Externa": {
-    subs: null,
-    tarefas: ["Selador","Pintura Texturizada","Recorte de Pintura"]
-  },
-  "Elétrica": {
-    subs: null,
-    tarefas: ["Acabamento elétricos"]
-  },
-  "Placas Solares": {
-    subs: null,
-    tarefas: ["Instalação"]
-  },
-  "Louças e Materiais": {
-    subs: null,
-    tarefas: ["Instalação"]
-  },
-  "Limpeza Final": {
-    subs: null,
-    tarefas: ["Interna","Externa"]
-  },
-  "Vistoria Técnica": {
-    subs: null,
-    tarefas: ["Interna","Externa"]
-  }
+const EMPREENDIMENTOS = {
+  GOIANIA: { id:"GOIANIA", nome:"Supremo Goiânia", total:72, prefixo:"Casa" },
+  GOIAS:   { id:"GOIAS",   nome:"Supremo Goiás",  total:149, prefixo:"Unidade" }
 };
 
-// ─── ESTADO ─────────────────────────────────────────────────
-let registros      = [];
-let unidadeAtual   = null;
-let idParaConcluir = null;
+// Estrutura macro-etapa / sub-etapa (base: EAP Custo Direto - Casas)
+const STAGES = [
+  { codigo:"01.03.01", nome:"Serviços Preliminares", subs:[] },
+  { codigo:"01.03.02", nome:"Fundação", subs:[
+      { codigo:"01.03.02.01", nome:"Fundação Profunda" },
+      { codigo:"01.03.02.02", nome:"Fundação Rasa" }
+  ]},
+  { codigo:"01.03.03", nome:"Estrutura", subs:[] },
+  { codigo:"01.03.04", nome:"Alvenaria", subs:[
+      { codigo:"01.03.04.01", nome:"Alvenaria de Vedação" },
+      { codigo:"01.03.04.02", nome:"Alvenaria Estrutural" },
+      { codigo:"01.03.04.03", nome:"Drywall" },
+      { codigo:"01.03.04.04", nome:"Demais Fechamentos" }
+  ]},
+  { codigo:"01.03.05", nome:"Cobertura", subs:[] },
+  { codigo:"01.03.06", nome:"Impermeabilização", subs:[] },
+  { codigo:"01.03.07", nome:"Revestimento Interno", subs:[
+      { codigo:"01.03.07.01", nome:"Revestimento de Massa" },
+      { codigo:"01.03.07.02", nome:"Revestimento de Gesso" },
+      { codigo:"01.03.07.03", nome:"Revestimento Cerâmico" },
+      { codigo:"01.03.07.04", nome:"Forro" }
+  ]},
+  { codigo:"01.03.08", nome:"Revestimento Externo", subs:[] },
+  { codigo:"01.03.09", nome:"Pisos", subs:[
+      { codigo:"01.03.09.01", nome:"Pisos Internos e Externos" },
+      { codigo:"01.03.09.02", nome:"Rodapé" }
+  ]},
+  { codigo:"01.03.10", nome:"Mármores e Granitos", subs:[] },
+  { codigo:"01.03.11", nome:"Esquadrias", subs:[
+      { codigo:"01.03.11.01", nome:"Esquadrias de Alumínio / Vidro" },
+      { codigo:"01.03.11.02", nome:"Esquadrias de Madeira" },
+      { codigo:"01.03.11.03", nome:"Esquadrias de Ferro" }
+  ]},
+  { codigo:"01.03.12", nome:"Instalações Elétrica", subs:[] },
+  { codigo:"01.03.13", nome:"Instalações Hidráulica", subs:[
+      { codigo:"01.03.13.01", nome:"Instalações Hidráulica" },
+      { codigo:"01.03.13.02", nome:"Louças e Metais" },
+      { codigo:"01.03.13.03", nome:"Instalações de Gás" },
+      { codigo:"01.03.13.04", nome:"Instalações de Incêndio" }
+  ]},
+  { codigo:"01.03.14", nome:"Instalações Mecânicas", subs:[] },
+  { codigo:"01.03.15", nome:"Elevador", subs:[] },
+  { codigo:"01.03.16", nome:"Pintura", subs:[
+      { codigo:"01.03.16.01", nome:"Pintura Interna" },
+      { codigo:"01.03.16.02", nome:"Pintura Externa" },
+      { codigo:"01.03.16.03", nome:"Pintura de Piso e Esquadrias" }
+  ]},
+  { codigo:"01.03.17", nome:"Limpeza", subs:[] }
+];
 
-// ─── API ────────────────────────────────────────────────────
-async function carregar() {
-  try {
-    const r = await fetch(URL_SCRIPT);
-    const d = await r.json();
-    if (d.success) registros = d.data;
-  } catch(e) {
-    toast("Erro ao conectar ao servidor");
+// status possíveis para qualquer folha (macro sem sub, ou sub)
+const STATUS = ["nao_iniciado","andamento","concluido"];
+const STATUS_LABEL = { nao_iniciado:"Não iniciado", andamento:"Em andamento", concluido:"Concluído" };
+
+/* ======================= ESTADO ======================= */
+// dados[empId][unidade][codigo] = status
+let DADOS = { GOIANIA:{}, GOIAS:{} };
+let LOADED = { GOIANIA:false, GOIAS:false };
+let currentEmp = null;
+let currentUnit = null;
+
+/* ======================= HELPERS ======================= */
+function leavesOf(stage){
+  return stage.subs.length ? stage.subs.map(s=>s.codigo) : [stage.codigo];
+}
+function allLeaves(){
+  let out = [];
+  STAGES.forEach(s => out = out.concat(leavesOf(s)));
+  return out;
+}
+const ALL_LEAVES = allLeaves();
+
+function getStatus(emp, unidade, codigo){
+  const u = DADOS[emp] && DADOS[emp][unidade];
+  return (u && u[codigo]) || "nao_iniciado";
+}
+function setStatusLocal(emp, unidade, codigo, status){
+  if(!DADOS[emp][unidade]) DADOS[emp][unidade] = {};
+  DADOS[emp][unidade][codigo] = status;
+}
+function stageStatus(emp, unidade, stage){
+  const leaves = leavesOf(stage);
+  const statuses = leaves.map(c => getStatus(emp, unidade, c));
+  if(statuses.every(s => s==="concluido")) return "concluido";
+  if(statuses.some(s => s!=="nao_iniciado")) return "andamento";
+  return "nao_iniciado";
+}
+function unitProgress(emp, unidade){
+  const total = ALL_LEAVES.length;
+  const done = ALL_LEAVES.filter(c => getStatus(emp, unidade, c)==="concluido").length;
+  return Math.round((done/total)*100);
+}
+function unitOverallStatus(emp, unidade){
+  const pct = unitProgress(emp, unidade);
+  if(pct===100) return "concluido";
+  if(pct>0) return "andamento";
+  return "nao_iniciado";
+}
+function empProgress(emp){
+  const total = EMPREENDIMENTOS[emp].total * ALL_LEAVES.length;
+  let done = 0;
+  for(let i=1;i<=EMPREENDIMENTOS[emp].total;i++){
+    done += ALL_LEAVES.filter(c => getStatus(emp, String(i), c)==="concluido").length;
   }
+  return total ? Math.round((done/total)*100) : 0;
+}
+
+function toast(msg, isErr, spinning){
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  const dot = document.getElementById("toastDot");
+  dot.classList.toggle("spin", !!spinning);
+  t.classList.toggle("err", !!isErr);
+  t.classList.add("show");
+  if(!spinning){
+    clearTimeout(window._toastTimer);
+    window._toastTimer = setTimeout(()=>t.classList.remove("show"), 1800);
+  }
+}
+function hideToast(){ document.getElementById("toast").classList.remove("show"); }
+
+/* ======================= API ======================= */
+function api(params){
+  const qs = new URLSearchParams(params).toString();
+  return fetch(URL_SCRIPT + "?" + qs).then(r=>r.json());
+}
+function loadEmp(emp){
+  if(LOADED[emp]) return Promise.resolve();
+  document.getElementById("gridLoading").style.display = "block";
+  return api({ action:"load", emp })
+    .then(res=>{
+      if(res.success){
+        const map = {};
+        (res.data||[]).forEach(row=>{
+          if(!map[row.Unidade]) map[row.Unidade] = {};
+          map[row.Unidade][row.CodigoEtapa] = row.Status;
+        });
+        DADOS[emp] = map;
+        LOADED[emp] = true;
+      }
+    })
+    .catch(()=> toast("Não deu pra carregar dados salvos. Conferindo offline.", true))
+    .finally(()=> document.getElementById("gridLoading").style.display = "none");
+}
+function saveOne(emp, unidade, codigo, nome, status){
+  setStatusLocal(emp, unidade, codigo, status);
+  renderDetail();
+  toast("Salvando...", false, true);
+  api({ action:"save", emp, unidade, codigo, nome, status })
+    .then(res=>{
+      if(res.success) toast("Salvo"); else toast("Erro ao salvar", true);
+    })
+    .catch(()=> toast("Sem conexão — tente de novo", true));
+}
+function saveBatch(emp, unidade, items){
+  items.forEach(it => setStatusLocal(emp, unidade, it.codigo, it.status));
+  renderDetail();
+  toast("Salvando...", false, true);
+  api({ action:"saveBatch", emp, unidade, items: JSON.stringify(items) })
+    .then(res=>{
+      if(res.success) toast("Salvo"); else toast("Erro ao salvar", true);
+    })
+    .catch(()=> toast("Sem conexão — tente de novo", true));
+}
+
+/* ======================= NAV ======================= */
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+document.getElementById("btnBack").addEventListener("click", ()=>{
+  if(document.getElementById("screen-detail").classList.contains("active")){
+    openGrid(currentEmp);
+  } else if(document.getElementById("screen-grid").classList.contains("active")){
+    openHome();
+  }
+});
+
+function openHome(){
+  currentEmp = null; currentUnit = null;
+  document.getElementById("btnBack").style.display = "none";
+  document.getElementById("headTitle").textContent = "Medição de Obra";
+  document.getElementById("headSub").textContent = "Selecione o empreendimento";
+  renderHome();
+  showScreen("screen-home");
+}
+function openGrid(emp){
+  currentEmp = emp; currentUnit = null;
+  const info = EMPREENDIMENTOS[emp];
+  document.getElementById("btnBack").style.display = "flex";
+  document.getElementById("headTitle").textContent = info.nome;
+  document.getElementById("headSub").textContent = info.total + " unidades";
+  showScreen("screen-grid");
+  loadEmp(emp).then(renderGrid);
   renderGrid();
 }
-
-async function apiCall(params) {
-  const url = new URL(URL_SCRIPT);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v ?? ""));
-  const r = await fetch(url.toString());
-  return r.json();
+function openDetail(unidade){
+  currentUnit = String(unidade);
+  const info = EMPREENDIMENTOS[currentEmp];
+  document.getElementById("btnBack").style.display = "flex";
+  document.getElementById("headTitle").textContent = info.nome;
+  document.getElementById("headSub").textContent = info.prefixo + " " + unidade;
+  document.getElementById("unitTitle").textContent = info.prefixo + " " + unidade;
+  showScreen("screen-detail");
+  renderDetail();
 }
 
-// ─── NAVEGAÇÃO ───────────────────────────────────────────────
-function tela(id) {
-  document.querySelectorAll(".tela").forEach(t => t.classList.remove("ativa"));
-  document.getElementById("tela-" + id).classList.add("ativa");
-}
-
-function navObra() {
-  document.getElementById("nav-obra").classList.add("ativo");
-  document.getElementById("nav-admin").classList.remove("ativo");
-  tela("grid");
-  renderGrid();
-}
-
-function navAdmin() {
-  document.getElementById("nav-admin").classList.add("ativo");
-  document.getElementById("nav-obra").classList.remove("ativo");
-  tela("admin");
-  renderAdmin();
-}
-
-function abrirUnidade(n) {
-  unidadeAtual = n;
-  tela("unidade");
-  renderUnidade();
-}
-
-function voltarGrid()    { tela("grid");    renderGrid(); }
-function voltarUnidade() { tela("unidade"); renderUnidade(); }
-
-function irForm() {
-  tela("form");
-  renderForm();
-}
-
-// ─── GRID ────────────────────────────────────────────────────
-function statusUnidade(n) {
-  const regs = registros.filter(r => Number(r.Unidade) === n);
-  if (!regs.length) return "sem";
-  if (regs.some(r => !r.DataConclusao)) return "andamento";
-  return "concluida";
-}
-
-function renderGrid() {
-  const g = document.getElementById("grid");
-  g.innerHTML = "";
-  let sem = 0, and = 0, ok = 0;
-
-  for (let i = 1; i <= TOTAL; i++) {
-    const s = statusUnidade(i);
-    if (s === "sem") sem++;
-    else if (s === "andamento") and++;
-    else ok++;
-
-    const b = document.createElement("button");
-    b.className = "casa " + s;
-    b.textContent = String(i).padStart(2, "0");
-    b.onclick = () => abrirUnidade(i);
-    g.appendChild(b);
-  }
-
-  document.getElementById("grid-sub").textContent = registros.length + " registros no total";
-  document.getElementById("cnt-sem").textContent = sem;
-  document.getElementById("cnt-and").textContent = and;
-  document.getElementById("cnt-ok").textContent  = ok;
-}
-
-// ─── UNIDADE ─────────────────────────────────────────────────
-function renderUnidade() {
-  const regs = registros
-    .filter(r => Number(r.Unidade) === unidadeAtual)
-    .sort((a, b) => Number(b.ID) - Number(a.ID));
-
-  const lbl = "Casa " + String(unidadeAtual).padStart(2, "0");
-  document.getElementById("uni-titulo").textContent = lbl;
-  document.getElementById("uni-sub").textContent =
-    regs.length + " etapa" + (regs.length !== 1 ? "s" : "") + " registrada" + (regs.length !== 1 ? "s" : "");
-
-  const lista = document.getElementById("lista-etapas");
-  if (!regs.length) {
-    lista.innerHTML = `<div class="empty"><div class="icon">📋</div><p>Nenhuma etapa registrada<br>para esta unidade ainda.</p></div>`;
-    return;
-  }
-
-  lista.innerHTML = regs.map(r => {
-    const concluido = !!r.DataConclusao;
-    const bread = [r.Macro, r.Sub].filter(Boolean).join(" › ");
-    return `
-      <div class="card">
-        <div class="card-bread">${bread}</div>
-        <div class="card-nome">${r.Tarefa}</div>
-        <div class="card-grid">
-          <div class="card-field">
-            <label>Início</label>
-            <span>${fmtData(r.DataInicio)}</span>
-          </div>
-          <div class="card-field">
-            <label>Conclusão</label>
-            <span>${concluido
-              ? `<span class="badge badge-ok">✓ ${fmtData(r.DataConclusao)}</span>`
-              : `<span class="badge badge-and">Em andamento</span>`}
-            </span>
-          </div>
-          <div class="card-field full">
-            <label>Equipe</label>
-            <span>${r.Equipe}</span>
-          </div>
-        </div>
-        ${!concluido ? `<button class="btn-concluir" onclick="abrirModal(${r.ID},'${esc(r.Tarefa)}')">Registrar conclusão</button>` : ""}
-      </div>`;
-  }).join("");
-}
-
-// ─── FORMULÁRIO ──────────────────────────────────────────────
-function renderForm() {
-  document.getElementById("form-titulo").textContent = "Nova Etapa";
-  document.getElementById("form-sub").textContent = "Casa " + String(unidadeAtual).padStart(2, "0");
-
-  const selM = document.getElementById("sel-macro");
-  selM.innerHTML = '<option value="">Selecione...</option>';
-  Object.keys(ETAPAS).forEach(m => {
-    const o = document.createElement("option");
-    o.value = o.textContent = m;
-    selM.appendChild(o);
+/* ======================= RENDER ======================= */
+function renderHome(){
+  const wrap = document.getElementById("homeCards");
+  wrap.innerHTML = "";
+  Object.values(EMPREENDIMENTOS).forEach(info=>{
+    const pct = LOADED[info.id] ? empProgress(info.id) : null;
+    const card = document.createElement("div");
+    card.className = "projcard";
+    card.innerHTML = `
+      <div style="flex:1">
+        <div class="pname">${info.nome}</div>
+        <div class="pmeta">${info.total} unidades</div>
+        <div class="projprog"><div class="bar"><i style="width:${pct||0}%"></i></div><div class="pct">${pct===null?"–":pct+"%"}</div></div>
+      </div>
+      <div class="parrow">›</div>`;
+    card.addEventListener("click", ()=> openGrid(info.id));
+    wrap.appendChild(card);
   });
-
-  document.getElementById("campo-sub").style.display = "none";
-  document.getElementById("sel-sub").innerHTML = '<option value="">Selecione...</option>';
-  const selT = document.getElementById("sel-tarefa");
-  selT.innerHTML = '<option value="">Selecione a macro etapa primeiro</option>';
-  selT.disabled = true;
-
-  document.getElementById("inp-inicio").value   = hoje();
-  document.getElementById("inp-equipe").value   = "";
-  document.getElementById("inp-conclusao").value = "";
-  validar();
 }
 
-function onMacro() {
-  const macro = document.getElementById("sel-macro").value;
-  const etapa = ETAPAS[macro];
-  const campSub = document.getElementById("campo-sub");
-  const selSub  = document.getElementById("sel-sub");
-  const selT    = document.getElementById("sel-tarefa");
-
-  selSub.innerHTML = '<option value="">Selecione...</option>';
-  selT.innerHTML   = '<option value="">Selecione...</option>';
-
-  if (!macro || !etapa) {
-    campSub.style.display = "none";
-    selT.disabled = true;
-    selT.innerHTML = '<option value="">Selecione a macro etapa primeiro</option>';
-    validar(); return;
+function renderGrid(){
+  const grid = document.getElementById("unitGrid");
+  const info = EMPREENDIMENTOS[currentEmp];
+  grid.innerHTML = "";
+  for(let i=1;i<=info.total;i++){
+    const u = String(i);
+    const st = unitOverallStatus(currentEmp, u);
+    const btn = document.createElement("div");
+    btn.className = "unit" + (st!=="nao_iniciado" ? " "+st : "");
+    btn.textContent = i;
+    btn.addEventListener("click", ()=> openDetail(u));
+    grid.appendChild(btn);
   }
+}
 
-  if (etapa.subs) {
-    campSub.style.display = "block";
-    Object.keys(etapa.subs).forEach(s => {
-      const o = document.createElement("option");
-      o.value = o.textContent = s;
-      selSub.appendChild(o);
-    });
-    selT.disabled = true;
-    selT.innerHTML = '<option value="">Selecione a sub etapa primeiro</option>';
-  } else {
-    campSub.style.display = "none";
-    etapa.tarefas.forEach(t => {
-      const o = document.createElement("option");
-      o.value = o.textContent = t;
-      selT.appendChild(o);
-    });
-    selT.disabled = false;
+document.getElementById("searchUnit").addEventListener("keydown", e=>{
+  if(e.key === "Enter"){
+    const v = parseInt(e.target.value,10);
+    const info = EMPREENDIMENTOS[currentEmp];
+    if(v>=1 && v<=info.total){ e.target.value=""; openDetail(String(v)); }
   }
-  validar();
-}
+});
 
-function onSub() {
-  const macro = document.getElementById("sel-macro").value;
-  const sub   = document.getElementById("sel-sub").value;
-  const selT  = document.getElementById("sel-tarefa");
+function renderDetail(){
+  const list = document.getElementById("stageList");
+  const emp = currentEmp, unidade = currentUnit;
+  const pct = unitProgress(emp, unidade);
+  document.getElementById("unitBar").style.width = pct + "%";
+  document.getElementById("unitPct").textContent = pct + "%";
 
-  selT.innerHTML = '<option value="">Selecione...</option>';
-  if (!sub) { selT.disabled = true; validar(); return; }
+  // preserve which stages are open
+  const openSet = new Set(Array.from(list.querySelectorAll(".stage.open")).map(el=>el.dataset.codigo));
 
-  ETAPAS[macro].subs[sub].forEach(t => {
-    const o = document.createElement("option");
-    o.value = o.textContent = t;
-    selT.appendChild(o);
-  });
-  selT.disabled = false;
-  validar();
-}
+  list.innerHTML = "";
+  STAGES.forEach(stage=>{
+    const status = stageStatus(emp, unidade, stage);
+    const hasSubs = stage.subs.length>0;
+    const doneCount = hasSubs ? stage.subs.filter(s=>getStatus(emp,unidade,s.codigo)==="concluido").length : 0;
 
-function validar() {
-  const macro  = document.getElementById("sel-macro").value;
-  const tarefa = document.getElementById("sel-tarefa").value;
-  const inicio = document.getElementById("inp-inicio").value;
-  const equipe = document.getElementById("inp-equipe").value.trim();
+    const el = document.createElement("div");
+    el.className = "stage" + (openSet.has(stage.codigo) ? " open" : "");
+    el.dataset.codigo = stage.codigo;
 
-  let subOk = true;
-  if (macro && ETAPAS[macro] && ETAPAS[macro].subs) {
-    subOk = !!document.getElementById("sel-sub").value;
-  }
+    const head = document.createElement("div");
+    head.className = "stagehead";
+    head.innerHTML = `
+      <div style="flex:1">
+        <div class="stagename">${stage.nome}</div>
+        ${hasSubs ? `<div class="stagesub">${doneCount}/${stage.subs.length} sub-etapas concluídas</div>` : ""}
+      </div>
+      ${hasSubs ? "" : `<button class="pill ${status!=="nao_iniciado"?status:""}" data-act="cyclemacro">${STATUS_LABEL[status]}</button>`}
+      ${hasSubs ? `<span class="pill ${status!=="nao_iniciado"?status:""}">${STATUS_LABEL[status]}</span><span class="chev">▸</span>` : ""}
+    `;
+    el.appendChild(head);
 
-  document.getElementById("btn-salvar").disabled = !(macro && tarefa && inicio && equipe && subOk);
-}
+    if(hasSubs){
+      const box = document.createElement("div");
+      box.className = "substuff";
+      stage.subs.forEach(sub=>{
+        const sStatus = getStatus(emp, unidade, sub.codigo);
+        const row = document.createElement("div");
+        row.className = "subrow";
+        row.innerHTML = `
+          <div class="subname">${sub.nome}</div>
+          <button class="pill ${sStatus!=="nao_iniciado"?sStatus:""}" data-act="cyclesub" data-codigo="${sub.codigo}" data-nome="${sub.nome}">${STATUS_LABEL[sStatus]}</button>
+        `;
+        box.appendChild(row);
+      });
+      const casc = document.createElement("div");
+      casc.className = "cascaderow";
+      casc.innerHTML = `
+        <button class="cascadebtn ok" data-act="marcartudo">✓ Marcar tudo concluído</button>
+        <button class="cascadebtn reset" data-act="resettudo">↺ Reset</button>
+      `;
+      box.appendChild(casc);
+      el.appendChild(box);
 
-async function salvar() {
-  const btn = document.getElementById("btn-salvar");
-  btn.disabled = true;
-  btn.textContent = "Salvando...";
-
-  const reg = {
-    Unidade:       unidadeAtual,
-    Macro:         document.getElementById("sel-macro").value,
-    Sub:           document.getElementById("sel-sub").value || "",
-    Tarefa:        document.getElementById("sel-tarefa").value,
-    Equipe:        document.getElementById("inp-equipe").value.trim(),
-    DataInicio:    document.getElementById("inp-inicio").value,
-    DataConclusao: document.getElementById("inp-conclusao").value || ""
-  };
-
-  try {
-    const res = await apiCall({ action: "add", ...reg });
-    if (res.success) {
-      reg.ID = res.id;
-      registros.push(reg);
-      toast("✓ Etapa salva!");
-      voltarUnidade();
-    } else {
-      throw new Error(res.error);
+      head.addEventListener("click", (e)=>{
+        if(e.target.closest("[data-act]")) return;
+        el.classList.toggle("open");
+      });
     }
-  } catch(e) {
-    toast("Erro ao salvar. Tente novamente.");
-    btn.disabled = false;
-    btn.textContent = "Salvar Etapa";
-  }
-}
 
-// ─── MODAL CONCLUSÃO ─────────────────────────────────────────
-function abrirModal(id, tarefa) {
-  idParaConcluir = id;
-  document.getElementById("modal-titulo").textContent = "Concluir: " + tarefa;
-  document.getElementById("inp-modal-data").value = hoje();
-  document.getElementById("modal").classList.add("show");
-}
-
-function fecharModal() {
-  document.getElementById("modal").classList.remove("show");
-  idParaConcluir = null;
-}
-
-async function confirmarConclusao() {
-  const data = document.getElementById("inp-modal-data").value;
-  if (!data) { toast("Informe a data de conclusão"); return; }
-
-  try {
-    const res = await apiCall({ action: "update", id: idParaConcluir, dataConclusao: data });
-    if (res.success) {
-      const reg = registros.find(r => String(r.ID) === String(idParaConcluir));
-      if (reg) reg.DataConclusao = data;
-      fecharModal();
-      toast("✓ Conclusão registrada!");
-      renderUnidade();
-      renderGrid();
-    }
-  } catch(e) {
-    toast("Erro ao salvar. Tente novamente.");
-  }
-}
-
-// ─── ADMIN ───────────────────────────────────────────────────
-function renderAdmin() {
-  document.getElementById("admin-sub").textContent = registros.length + " registros totais";
-
-  const resumo = {};
-  registros.forEach(r => {
-    if (!resumo[r.Macro]) resumo[r.Macro] = { total: 0, ok: 0, unidades: new Set() };
-    resumo[r.Macro].total++;
-    if (r.DataConclusao) resumo[r.Macro].ok++;
-    resumo[r.Macro].unidades.add(r.Unidade);
+    list.appendChild(el);
   });
 
-  const div = document.getElementById("admin-resumo");
-  if (!Object.keys(resumo).length) {
-    div.innerHTML = `<div class="empty"><div class="icon">📊</div><p>Nenhum dado ainda.</p></div>`;
-    return;
-  }
+  // event delegation for pills / cascade buttons
+  list.querySelectorAll('[data-act="cyclemacro"]').forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      const stageEl = btn.closest(".stage");
+      const codigo = stageEl.dataset.codigo;
+      const stage = STAGES.find(s=>s.codigo===codigo);
+      const cur = getStatus(emp, unidade, codigo);
+      const next = STATUS[(STATUS.indexOf(cur)+1) % STATUS.length];
+      saveOne(emp, unidade, codigo, stage.nome, next);
+    });
+  });
+  list.querySelectorAll('[data-act="cyclesub"]').forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      const codigo = btn.dataset.codigo, nome = btn.dataset.nome;
+      const cur = getStatus(emp, unidade, codigo);
+      const next = STATUS[(STATUS.indexOf(cur)+1) % STATUS.length];
+      saveOne(emp, unidade, codigo, nome, next);
+    });
+  });
+  list.querySelectorAll('[data-act="marcartudo"]').forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      const stageEl = btn.closest(".stage");
+      const stage = STAGES.find(s=>s.codigo===stageEl.dataset.codigo);
+      const items = stage.subs.map(s=>({codigo:s.codigo, nome:s.nome, status:"concluido"}));
+      saveBatch(emp, unidade, items);
+    });
+  });
+  list.querySelectorAll('[data-act="resettudo"]').forEach(btn=>{
+    btn.addEventListener("click", (e)=>{
+      e.stopPropagation();
+      const stageEl = btn.closest(".stage");
+      const stage = STAGES.find(s=>s.codigo===stageEl.dataset.codigo);
+      const items = stage.subs.map(s=>({codigo:s.codigo, nome:s.nome, status:"nao_iniciado"}));
+      saveBatch(emp, unidade, items);
+    });
+  });
 
-  div.innerHTML = Object.entries(resumo).map(([macro, d]) => {
-    const pct  = Math.round(d.ok / d.total * 100);
-    const cor  = pct === 100 ? "var(--verde)" : pct > 0 ? "var(--amarelo)" : "var(--cinza)";
-    return `
-      <div class="resumo-card">
-        <div>
-          <div class="resumo-macro">${macro}</div>
-          <div class="resumo-sub">${d.total} registro${d.total!==1?"s":""} · ${d.unidades.size} unidade${d.unidades.size!==1?"s":""}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="resumo-pct" style="color:${cor}">${pct}%</div>
-          <div style="font-size:11px;color:var(--cinza)">${d.ok}/${d.total}</div>
-        </div>
-      </div>`;
-  }).join("");
+  // refresh grid dots in background too (so going back shows updated colors without refetch)
 }
 
-// ─── EXPORTAÇÃO ──────────────────────────────────────────────
-function exportCSV() {
-  if (!registros.length) { toast("Nenhum dado para exportar"); return; }
-  const h = ["Unidade","Macro","Sub","Tarefa","Equipe","Data Início","Data Conclusão"];
-  const rows = registros.map(r => [
-    r.Unidade, r.Macro, r.Sub||"", r.Tarefa, r.Equipe,
-    fmtData(r.DataInicio), r.DataConclusao ? fmtData(r.DataConclusao) : ""
-  ]);
-  const csv = [h,...rows].map(row => row.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
-  baixar("\uFEFF"+csv, "medicoes_"+hoje()+".csv", "text/csv;charset=utf-8");
-}
-
-function exportXLSX() {
-  if (!registros.length) { toast("Nenhum dado para exportar"); return; }
-  const rows = registros.map(r => ({
-    "Unidade":        Number(r.Unidade),
-    "Macro":          r.Macro,
-    "Sub":            r.Sub || "",
-    "Tarefa":         r.Tarefa,
-    "Equipe":         r.Equipe,
-    "Data Início":    fmtData(r.DataInicio),
-    "Data Conclusão": r.DataConclusao ? fmtData(r.DataConclusao) : ""
-  }));
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Medições");
-  XLSX.writeFile(wb, "medicoes_" + hoje() + ".xlsx");
-}
-
-// ─── UTILITÁRIOS ─────────────────────────────────────────────
-function fmtData(d) {
-  if (!d) return "–";
-  const [y,m,dia] = d.split("-");
-  return `${dia}/${m}/${y}`;
-}
-
-function hoje() {
-  return new Date().toISOString().split("T")[0];
-}
-
-function toast(msg) {
-  const el = document.getElementById("toast");
-  el.textContent = msg;
-  el.classList.add("show");
-  setTimeout(() => el.classList.remove("show"), 2500);
-}
-
-function esc(s) { return s.replace(/'/g,"\\'"); }
-
-function baixar(conteudo, nome, tipo) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([conteudo], {type: tipo}));
-  a.download = nome;
-  a.click();
-}
-
-// ─── INIT ────────────────────────────────────────────────────
-carregar();
+/* ======================= INIT ======================= */
+openHome();
 </script>
 </body>
 </html>
