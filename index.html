@@ -104,6 +104,8 @@
   .unitprog .pct{font-size:12px;color:var(--txt2);font-weight:700;min-width:34px;text-align:right;}
   .stagelist{padding:6px 16px 40px;display:flex;flex-direction:column;gap:9px;}
   .stage{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;}
+  .substuff .stage.nested{border-radius:10px;margin:9px 13px;border-color:#eceef4;}
+  .stage.nested .stagename{font-size:13.5px;}
   .stagehead{display:flex;align-items:center;padding:12px 13px;gap:10px;cursor:pointer;}
   .stagename{flex:1;font-size:14.5px;font-weight:600;}
   .stagesub{font-size:11.5px;color:var(--txt3);margin-top:1px;font-weight:400;}
@@ -205,57 +207,134 @@ const EMPREENDIMENTOS = {
   GOIAS:   { id:"GOIAS",   nome:"Supremo Goiás",  total:149, prefixo:"Unidade" }
 };
 
-// Estrutura macro-etapa / sub-etapa (base: EAP Custo Direto - Casas)
+// Estrutura macro-etapa / sub-etapa real de execução (checklist de campo)
+// Cada nó pode ter "children". Nó sem children = folha (togglável nos 3 status).
+// Nó com children = agrupador (status derivado, com cascata de marcar/resetar tudo).
+function leaf(codigo, nome){ return { codigo, nome, children: [] }; }
+function group(codigo, nome, children){ return { codigo, nome, children }; }
+
 const STAGES = [
-  { codigo:"01.03.01", nome:"Serviços Preliminares", subs:[] },
-  { codigo:"01.03.02", nome:"Fundação", subs:[
-      { codigo:"01.03.02.01", nome:"Fundação Profunda" },
-      { codigo:"01.03.02.02", nome:"Fundação Rasa" }
-  ]},
-  { codigo:"01.03.03", nome:"Estrutura", subs:[] },
-  { codigo:"01.03.04", nome:"Alvenaria", subs:[
-      { codigo:"01.03.04.01", nome:"Alvenaria de Vedação" },
-      { codigo:"01.03.04.02", nome:"Alvenaria Estrutural" },
-      { codigo:"01.03.04.03", nome:"Drywall" },
-      { codigo:"01.03.04.04", nome:"Demais Fechamentos" }
-  ]},
-  { codigo:"01.03.05", nome:"Cobertura", subs:[] },
-  { codigo:"01.03.06", nome:"Impermeabilização", subs:[] },
-  { codigo:"01.03.07", nome:"Revestimento Interno", subs:[
-      { codigo:"01.03.07.01", nome:"Revestimento de Massa" },
-      { codigo:"01.03.07.02", nome:"Revestimento de Gesso" },
-      { codigo:"01.03.07.03", nome:"Revestimento Cerâmico" },
-      { codigo:"01.03.07.04", nome:"Forro" }
-  ]},
-  { codigo:"01.03.08", nome:"Revestimento Externo", subs:[] },
-  { codigo:"01.03.09", nome:"Pisos", subs:[
-      { codigo:"01.03.09.01", nome:"Pisos Internos e Externos" },
-      { codigo:"01.03.09.02", nome:"Rodapé" }
-  ]},
-  { codigo:"01.03.10", nome:"Mármores e Granitos", subs:[] },
-  { codigo:"01.03.11", nome:"Esquadrias", subs:[
-      { codigo:"01.03.11.01", nome:"Esquadrias de Alumínio / Vidro" },
-      { codigo:"01.03.11.02", nome:"Esquadrias de Madeira" },
-      { codigo:"01.03.11.03", nome:"Esquadrias de Ferro" }
-  ]},
-  { codigo:"01.03.12", nome:"Instalações Elétrica", subs:[] },
-  { codigo:"01.03.13", nome:"Instalações Hidráulica", subs:[
-      { codigo:"01.03.13.01", nome:"Instalações Hidráulica" },
-      { codigo:"01.03.13.02", nome:"Louças e Metais" },
-      { codigo:"01.03.13.03", nome:"Instalações de Gás" },
-      { codigo:"01.03.13.04", nome:"Instalações de Incêndio" }
-  ]},
-  { codigo:"01.03.14", nome:"Instalações Mecânicas", subs:[] },
-  { codigo:"01.03.15", nome:"Elevador", subs:[] },
-  { codigo:"01.03.16", nome:"Pintura", subs:[
-      { codigo:"01.03.16.01", nome:"Pintura Interna" },
-      { codigo:"01.03.16.02", nome:"Pintura Externa" },
-      { codigo:"01.03.16.03", nome:"Pintura de Piso e Esquadrias" }
-  ]},
-  { codigo:"01.03.17", nome:"Limpeza", subs:[] }
+  group("01", "Radier", [
+    leaf("01.01", "Escavação de Blocos"),
+    leaf("01.02", "Colocação de forma metálica"),
+    leaf("01.03", "Infra-elétrica"),
+    leaf("01.04", "Infra-esgoto"),
+    leaf("01.05", "Lastro de brita e lona"),
+    leaf("01.06", "Armação"),
+    leaf("01.07", "Concretagem")
+  ]),
+  group("02", "Estrutura", [
+    group("02.01", "Pavimento Térreo", [
+      leaf("02.01.01", "Armação de Pilares"),
+      leaf("02.01.02", "Fechamento de formas e pilares"),
+      leaf("02.01.03", "Concretagem dos pilares"),
+      leaf("02.01.04", "Fechamento de forma de vigas e lajes + Escada"),
+      leaf("02.01.05", "Armação de vigas e lajes + Escada"),
+      leaf("02.01.06", "Concretagem de vigas e lajes + Escada"),
+      leaf("02.01.07", "Desforma"),
+      leaf("02.01.08", "Retirar as Escoras")
+    ]),
+    group("02.02", "Pavimento Superior", [
+      leaf("02.02.01", "Armação de Pilares"),
+      leaf("02.02.02", "Fechamento de formas e pilares"),
+      leaf("02.02.03", "Concretagem dos pilares"),
+      leaf("02.02.04", "Fechamento de forma de vigas e lajes"),
+      leaf("02.02.05", "Armação de vigas e lajes"),
+      leaf("02.02.06", "Concretagem de vigas e lajes"),
+      leaf("02.02.07", "Desforma"),
+      leaf("02.02.08", "Retirar as Escoras")
+    ])
+  ]),
+  group("03", "Alvenaria", [
+    group("03.01", "Pavimento Térreo", [
+      leaf("03.01.01", "Marcação de alvenaria"),
+      leaf("03.01.02", "Elevação de alvenaria - blocos"),
+      leaf("03.01.03", "Encunhamento"),
+      leaf("03.01.04", "Tratamento de juntas")
+    ]),
+    group("03.02", "Pavimento Superior", [
+      leaf("03.02.01", "Marcação de alvenaria"),
+      leaf("03.02.02", "Elevação de alvenaria - blocos"),
+      leaf("03.02.03", "Encunhamento"),
+      leaf("03.02.04", "Tratamento de juntas")
+    ])
+  ]),
+  group("04", "Contrapiso", [
+    leaf("04.01", "Regularização"),
+    leaf("04.02", "Impermeabilização de banheiro"),
+    leaf("04.03", "Impermeabilização de laje"),
+    leaf("04.04", "Proteção mecânica de laje")
+  ]),
+  group("05", "Infra-Elétrica", [
+    leaf("05.01", "Tubulação e caixa embutida"),
+    leaf("05.02", "Enfiação"),
+    leaf("05.03", "Fechamento de quadros"),
+    leaf("05.04", "Infra energia solar")
+  ]),
+  group("06", "Instalações Hidráulicas", [
+    leaf("06.01", "Água fria e quente"),
+    leaf("06.02", "Fechamento de tubulações aéreas"),
+    leaf("06.03", "Drenos de AC")
+  ]),
+  group("07", "Gesso", [
+    leaf("07.01", "Tabica"),
+    leaf("07.02", "Gesso em placa"),
+    leaf("07.03", "Gesso corrido"),
+    leaf("07.04", "Glassrock fachada")
+  ]),
+  group("08", "Esquadrias Metálicas", [
+    leaf("08.01", "Peitoril"),
+    leaf("08.02", "Janela"),
+    leaf("08.03", "Pele de vidro"),
+    leaf("08.04", "Guarda Corpo")
+  ]),
+  group("09", "Revestimento Cerâmico", [
+    leaf("09.01", "Parede"),
+    leaf("09.02", "Piso"),
+    leaf("09.03", "Revestimento de pedras naturais"),
+    leaf("09.04", "Soleiras"),
+    leaf("09.05", "Rejuntamento")
+  ]),
+  group("10", "Bancadas", [
+    leaf("10.01", "Banheiro"),
+    leaf("10.02", "Cozinha"),
+    leaf("10.03", "Lavabo"),
+    leaf("10.04", "Escada de Granito")
+  ]),
+  group("11", "Pintura Interna", [
+    leaf("11.01", "Emassamento"),
+    leaf("11.02", "1º demão pintura"),
+    leaf("11.03", "2º demão pintura")
+  ]),
+  group("12", "Esquadrias", [
+    leaf("12.01", "Portas de madeira"),
+    leaf("12.02", "Esquadrias metálicas")
+  ]),
+  group("13", "Pintura Externa", [
+    leaf("13.01", "Selador"),
+    leaf("13.02", "Pintura texturizada"),
+    leaf("13.03", "Recorte de pintura")
+  ]),
+  group("14", "Elétrica", [
+    leaf("14.01", "Acabamento elétricos")
+  ]),
+  group("15", "Placas Solares", [
+    leaf("15.01", "Instalação")
+  ]),
+  group("16", "Louças e Metais", [
+    leaf("16.01", "Instalação")
+  ]),
+  group("17", "Limpeza Final", [
+    leaf("17.01", "Interna"),
+    leaf("17.02", "Externa")
+  ]),
+  group("18", "Vistoria Técnica", [
+    leaf("18.01", "Interna"),
+    leaf("18.02", "Externa")
+  ])
 ];
 
-// status possíveis para qualquer folha (macro sem sub, ou sub)
+// status possíveis para qualquer folha
 const STATUS = ["nao_iniciado","andamento","concluido"];
 const STATUS_LABEL = { nao_iniciado:"Não iniciado", andamento:"Em andamento", concluido:"Concluído" };
 
@@ -267,15 +346,27 @@ let currentEmp = null;
 let currentUnit = null;
 
 /* ======================= HELPERS ======================= */
-function leavesOf(stage){
-  return stage.subs.length ? stage.subs.map(s=>s.codigo) : [stage.codigo];
+function isLeaf(node){ return !node.children || node.children.length===0; }
+
+// todas as folhas (recursivo) abaixo de um nó — inclui o próprio nó se ele for folha
+function collectLeaves(node){
+  return isLeaf(node) ? [node] : node.children.reduce((acc,c)=>acc.concat(collectLeaves(c)), []);
 }
 function allLeaves(){
-  let out = [];
-  STAGES.forEach(s => out = out.concat(leavesOf(s)));
-  return out;
+  return STAGES.reduce((acc,s)=>acc.concat(collectLeaves(s)), []).map(n=>n.codigo);
 }
 const ALL_LEAVES = allLeaves();
+
+function findNodeByCode(nodes, codigo){
+  for(const n of nodes){
+    if(n.codigo === codigo) return n;
+    if(n.children && n.children.length){
+      const found = findNodeByCode(n.children, codigo);
+      if(found) return found;
+    }
+  }
+  return null;
+}
 
 function getStatus(emp, unidade, codigo){
   const u = DADOS[emp] && DADOS[emp][unidade];
@@ -285,9 +376,10 @@ function setStatusLocal(emp, unidade, codigo, status){
   if(!DADOS[emp][unidade]) DADOS[emp][unidade] = {};
   DADOS[emp][unidade][codigo] = status;
 }
-function stageStatus(emp, unidade, stage){
-  const leaves = leavesOf(stage);
-  const statuses = leaves.map(c => getStatus(emp, unidade, c));
+// status de qualquer nó: se for folha, é o próprio status salvo; se for agrupador, é derivado das folhas abaixo
+function nodeStatus(emp, unidade, node){
+  if(isLeaf(node)) return getStatus(emp, unidade, node.codigo);
+  const statuses = collectLeaves(node).map(l => getStatus(emp, unidade, l.codigo));
   if(statuses.every(s => s==="concluido")) return "concluido";
   if(statuses.some(s => s!=="nao_iniciado")) return "andamento";
   return "nao_iniciado";
@@ -455,6 +547,63 @@ document.getElementById("searchUnit").addEventListener("keydown", e=>{
   }
 });
 
+// Constrói o elemento DOM de um nó da árvore, recursivamente.
+// Folha = linha simples com pill togglável. Agrupador = card com header + filhos + cascata.
+function buildNodeEl(node, emp, unidade, depth, openSet){
+  if(isLeaf(node)){
+    const status = getStatus(emp, unidade, node.codigo);
+    const row = document.createElement("div");
+    row.className = "subrow";
+    row.style.paddingLeft = (24 + Math.max(0, depth-1)*14) + "px";
+    row.innerHTML = `
+      <div class="subname">${node.nome}</div>
+      <button class="pill ${status!=="nao_iniciado"?status:""}" data-act="cycleleaf" data-codigo="${node.codigo}" data-nome="${node.nome}">${STATUS_LABEL[status]}</button>
+    `;
+    return row;
+  }
+
+  const status = nodeStatus(emp, unidade, node);
+  const leafCount = collectLeaves(node).length;
+  const doneCount = collectLeaves(node).filter(l => getStatus(emp,unidade,l.codigo)==="concluido").length;
+
+  const el = document.createElement("div");
+  el.className = "stage" + (openSet.has(node.codigo) ? " open" : "") + (depth>0 ? " nested" : "");
+  el.dataset.codigo = node.codigo;
+
+  const head = document.createElement("div");
+  head.className = "stagehead";
+  head.style.paddingLeft = (13 + depth*14) + "px";
+  head.innerHTML = `
+    <div style="flex:1">
+      <div class="stagename">${node.nome}</div>
+      <div class="stagesub">${doneCount}/${leafCount} concluídas</div>
+    </div>
+    <span class="pill ${status!=="nao_iniciado"?status:""}">${STATUS_LABEL[status]}</span><span class="chev">▸</span>
+  `;
+  el.appendChild(head);
+
+  const box = document.createElement("div");
+  box.className = "substuff";
+  node.children.forEach(child => box.appendChild(buildNodeEl(child, emp, unidade, depth+1, openSet)));
+
+  const casc = document.createElement("div");
+  casc.className = "cascaderow";
+  casc.style.paddingLeft = (13 + depth*14) + "px";
+  casc.innerHTML = `
+    <button class="cascadebtn ok" data-act="marcartudo" data-codigo="${node.codigo}">✓ Marcar tudo concluído</button>
+    <button class="cascadebtn reset" data-act="resettudo" data-codigo="${node.codigo}">↺ Reset</button>
+  `;
+  box.appendChild(casc);
+  el.appendChild(box);
+
+  head.addEventListener("click", (e)=>{
+    if(e.target.closest("[data-act]")) return;
+    el.classList.toggle("open");
+  });
+
+  return el;
+}
+
 function renderDetail(){
   const list = document.getElementById("stageList");
   const emp = currentEmp, unidade = currentUnit;
@@ -462,104 +611,35 @@ function renderDetail(){
   document.getElementById("unitBar").style.width = pct + "%";
   document.getElementById("unitPct").textContent = pct + "%";
 
-  // preserve which stages are open
+  // preserve which nós estavam abertos
   const openSet = new Set(Array.from(list.querySelectorAll(".stage.open")).map(el=>el.dataset.codigo));
 
   list.innerHTML = "";
-  STAGES.forEach(stage=>{
-    const status = stageStatus(emp, unidade, stage);
-    const hasSubs = stage.subs.length>0;
-    const doneCount = hasSubs ? stage.subs.filter(s=>getStatus(emp,unidade,s.codigo)==="concluido").length : 0;
-
-    const el = document.createElement("div");
-    el.className = "stage" + (openSet.has(stage.codigo) ? " open" : "");
-    el.dataset.codigo = stage.codigo;
-
-    const head = document.createElement("div");
-    head.className = "stagehead";
-    head.innerHTML = `
-      <div style="flex:1">
-        <div class="stagename">${stage.nome}</div>
-        ${hasSubs ? `<div class="stagesub">${doneCount}/${stage.subs.length} sub-etapas concluídas</div>` : ""}
-      </div>
-      ${hasSubs ? "" : `<button class="pill ${status!=="nao_iniciado"?status:""}" data-act="cyclemacro">${STATUS_LABEL[status]}</button>`}
-      ${hasSubs ? `<span class="pill ${status!=="nao_iniciado"?status:""}">${STATUS_LABEL[status]}</span><span class="chev">▸</span>` : ""}
-    `;
-    el.appendChild(head);
-
-    if(hasSubs){
-      const box = document.createElement("div");
-      box.className = "substuff";
-      stage.subs.forEach(sub=>{
-        const sStatus = getStatus(emp, unidade, sub.codigo);
-        const row = document.createElement("div");
-        row.className = "subrow";
-        row.innerHTML = `
-          <div class="subname">${sub.nome}</div>
-          <button class="pill ${sStatus!=="nao_iniciado"?sStatus:""}" data-act="cyclesub" data-codigo="${sub.codigo}" data-nome="${sub.nome}">${STATUS_LABEL[sStatus]}</button>
-        `;
-        box.appendChild(row);
-      });
-      const casc = document.createElement("div");
-      casc.className = "cascaderow";
-      casc.innerHTML = `
-        <button class="cascadebtn ok" data-act="marcartudo">✓ Marcar tudo concluído</button>
-        <button class="cascadebtn reset" data-act="resettudo">↺ Reset</button>
-      `;
-      box.appendChild(casc);
-      el.appendChild(box);
-
-      head.addEventListener("click", (e)=>{
-        if(e.target.closest("[data-act]")) return;
-        el.classList.toggle("open");
-      });
-    }
-
-    list.appendChild(el);
-  });
-
-  // event delegation for pills / cascade buttons
-  list.querySelectorAll('[data-act="cyclemacro"]').forEach(btn=>{
-    btn.addEventListener("click", (e)=>{
-      e.stopPropagation();
-      const stageEl = btn.closest(".stage");
-      const codigo = stageEl.dataset.codigo;
-      const stage = STAGES.find(s=>s.codigo===codigo);
-      const cur = getStatus(emp, unidade, codigo);
-      const next = STATUS[(STATUS.indexOf(cur)+1) % STATUS.length];
-      saveOne(emp, unidade, codigo, stage.nome, next);
-    });
-  });
-  list.querySelectorAll('[data-act="cyclesub"]').forEach(btn=>{
-    btn.addEventListener("click", (e)=>{
-      e.stopPropagation();
-      const codigo = btn.dataset.codigo, nome = btn.dataset.nome;
-      const cur = getStatus(emp, unidade, codigo);
-      const next = STATUS[(STATUS.indexOf(cur)+1) % STATUS.length];
-      saveOne(emp, unidade, codigo, nome, next);
-    });
-  });
-  list.querySelectorAll('[data-act="marcartudo"]').forEach(btn=>{
-    btn.addEventListener("click", (e)=>{
-      e.stopPropagation();
-      const stageEl = btn.closest(".stage");
-      const stage = STAGES.find(s=>s.codigo===stageEl.dataset.codigo);
-      const items = stage.subs.map(s=>({codigo:s.codigo, nome:s.nome, status:"concluido"}));
-      saveBatch(emp, unidade, items);
-    });
-  });
-  list.querySelectorAll('[data-act="resettudo"]').forEach(btn=>{
-    btn.addEventListener("click", (e)=>{
-      e.stopPropagation();
-      const stageEl = btn.closest(".stage");
-      const stage = STAGES.find(s=>s.codigo===stageEl.dataset.codigo);
-      const items = stage.subs.map(s=>({codigo:s.codigo, nome:s.nome, status:"nao_iniciado"}));
-      saveBatch(emp, unidade, items);
-    });
-  });
-
-  // refresh grid dots in background too (so going back shows updated colors without refetch)
+  STAGES.forEach(stage => list.appendChild(buildNodeEl(stage, emp, unidade, 0, openSet)));
 }
+
+// listener único (delegado) pra qualquer pill/cascata em qualquer profundidade
+document.getElementById("stageList").addEventListener("click", (e)=>{
+  const btn = e.target.closest("[data-act]");
+  if(!btn) return;
+  e.stopPropagation();
+  const emp = currentEmp, unidade = currentUnit;
+  const act = btn.dataset.act;
+
+  if(act === "cycleleaf"){
+    const codigo = btn.dataset.codigo, nome = btn.dataset.nome;
+    const cur = getStatus(emp, unidade, codigo);
+    const next = STATUS[(STATUS.indexOf(cur)+1) % STATUS.length];
+    saveOne(emp, unidade, codigo, nome, next);
+  } else if(act === "marcartudo" || act === "resettudo"){
+    const codigo = btn.dataset.codigo;
+    const node = findNodeByCode(STAGES, codigo);
+    if(!node) return;
+    const targetStatus = act === "marcartudo" ? "concluido" : "nao_iniciado";
+    const items = collectLeaves(node).map(l => ({codigo:l.codigo, nome:l.nome, status:targetStatus}));
+    saveBatch(emp, unidade, items);
+  }
+});
 
 /* ======================= INIT ======================= */
 openHome();
