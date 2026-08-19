@@ -407,9 +407,12 @@ function getDataConclusao(emp, unidade, codigo){
   return (u && u.dataConclusao) || "";
 }
 function fmtDateBR(iso){
-  // "yyyy-MM-dd" -> "dd/mm/aaaa"
+  // "yyyy-MM-dd" -> "dd/mm/aaaa". Também aceita "yyyy-MM-ddTHH:mm:ss.sssZ" (caso a
+  // planilha devolva com hora junto) — usa só a parte da data, ignora o resto.
   if(!iso) return "";
-  const [y,m,d] = iso.split("-");
+  const datePart = String(iso).split("T")[0];
+  const [y,m,d] = datePart.split("-");
+  if(!y || !m || !d) return "";
   return `${d}/${m}/${y}`;
 }
 function todayISO(){
