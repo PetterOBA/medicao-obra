@@ -556,6 +556,12 @@ function openDetail(unidade){
   document.getElementById("unitTitle").textContent = info.prefixo + " " + unidade;
   showScreen("screen-detail");
   renderDetail();
+  // se o carregamento da planilha ainda não tinha terminado quando a pessoa entrou
+  // direto na casa, isso garante que a tela é redesenhada assim que os dados chegam
+  // (sem isso, a tela ficava presa mostrando tudo "não iniciado" pra sempre)
+  loadEmp(currentEmp).then(()=>{
+    if(currentUnit === unidade) renderDetail();
+  });
 }
 
 /* ======================= RENDER ======================= */
