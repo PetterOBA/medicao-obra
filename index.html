@@ -468,8 +468,11 @@ function hideToast(){ document.getElementById("toast").classList.remove("show");
 
 /* ======================= API ======================= */
 function api(params){
-  const qs = new URLSearchParams(params).toString();
-  return fetch(URL_SCRIPT + "?" + qs).then(r=>r.json());
+  // adiciona um valor único na URL + cache:"no-store" pra garantir que o navegador
+  // nunca devolva uma resposta antiga em cache (principalmente no "load" — sem isso,
+  // dados novos salvos no BD podem não aparecer até o cache expirar sozinho)
+  const qs = new URLSearchParams({ ...params, _ts: Date.now() }).toString();
+  return fetch(URL_SCRIPT + "?" + qs, { cache: "no-store" }).then(r=>r.json());
 }
 function loadEmp(emp){
   if(LOADED[emp]) return Promise.resolve();
