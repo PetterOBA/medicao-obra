@@ -1,648 +1,101 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Medição de Obra — SUMMUS</title>
-<style>
-  :root{
-    --navy:#0a1338;
-    --navy2:#0c1fa0;
-    --gold:#c9a227;
-    --bg:#f2f3f6;
-    --card:#ffffff;
-    --line:#e4e6ee;
-    --txt:#171b2e;
-    --txt2:#5c6377;
-    --txt3:#9298a8;
-    --gray:#a3aab8;
-    --grayBg:#eef0f4;
-    --amber:#e5940f;
-    --amberBg:#fdf1dc;
-    --green:#1a9e5c;
-    --greenBg:#e2f6ea;
-    --danger:#d43f3f;
+// ============================================================
+// MEDIÇÃO DE OBRA — MACRO-ETAPAS (Supremo Goiânia / Supremo Goiás)
+// Google Apps Script — tudo via GET pra evitar bloqueio de CORS
+// ============================================================
+
+const ABA = "Medicoes";
+
+function garantirAba() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(ABA);
+  if (!sheet) {
+    sheet = ss.insertSheet(ABA);
+    sheet.appendRow(["Empreendimento","Unidade","CodigoEtapa","NomeEtapa","Status","AtualizadoEm"]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1,1,1,6).setBackground("#0a1338").setFontColor("#ffffff").setFontWeight("bold");
+    sheet.setColumnWidths(1,6,140);
   }
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;}
-  body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
-    background:var(--bg);
-    color:var(--txt);
-    -webkit-font-smoothing:antialiased;
-    overscroll-behavior-y:none;
-  }
-  button{font-family:inherit;}
-  .app{max-width:560px;margin:0 auto;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;}
-
-  /* header */
-  header{
-    background:linear-gradient(135deg,var(--navy),var(--navy2));
-    color:#fff;padding:16px 18px 14px;
-    position:sticky;top:0;z-index:20;
-    border-bottom:3px solid var(--gold);
-  }
-  .brandrow{display:flex;align-items:center;justify-content:space-between;}
-  .brand{font-weight:800;letter-spacing:.06em;font-size:15px;}
-  .brand small{display:block;font-weight:500;letter-spacing:.14em;font-size:9px;color:var(--gold);margin-top:1px;}
-  .hbtn{background:rgba(255,255,255,.12);border:none;color:#fff;width:34px;height:34px;border-radius:9px;font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-  .hbtn:active{background:rgba(255,255,255,.22);}
-  .htitle{font-size:18px;font-weight:700;margin-top:2px;}
-  .hsub{font-size:12.5px;color:#c7cdea;margin-top:2px;}
-
-  /* screens */
-  .screen{display:none;flex:1;flex-direction:column;}
-  .screen.active{display:flex;}
-
-  /* home screen */
-  .home{padding:22px 18px 40px;gap:14px;display:flex;flex-direction:column;}
-  .home-hint{color:var(--txt2);font-size:13.5px;margin-bottom:2px;}
-  .projcard{
-    background:var(--card);border:1px solid var(--line);border-radius:16px;
-    padding:18px 18px;display:flex;align-items:center;justify-content:space-between;
-    cursor:pointer;transition:transform .1s;
-  }
-  .projcard:active{transform:scale(.98);background:#fafaff;}
-  .projcard .pname{font-weight:700;font-size:16px;color:var(--navy);}
-  .projcard .pmeta{font-size:12.5px;color:var(--txt2);margin-top:3px;}
-  .projcard .parrow{font-size:20px;color:var(--gold);}
-  .projprog{display:flex;align-items:center;gap:7px;margin-top:9px;}
-  .projprog .bar{flex:1;height:6px;background:var(--grayBg);border-radius:4px;overflow:hidden;}
-  .projprog .bar i{display:block;height:100%;background:var(--green);border-radius:4px;}
-  .projprog .pct{font-size:11.5px;color:var(--txt2);font-weight:600;min-width:32px;text-align:right;}
-
-  /* grid screen */
-  .gridwrap{padding:14px 16px 30px;flex:1;}
-  .searchrow{display:flex;gap:8px;margin-bottom:14px;}
-  .searchrow input{
-    flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
-    font-size:14px;background:var(--card);
-  }
-  .searchrow input:focus{outline:2px solid var(--navy2);}
-  .legend{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
-  .legend span{font-size:11.5px;color:var(--txt2);display:flex;align-items:center;gap:5px;}
-  .legend i{width:9px;height:9px;border-radius:3px;display:block;}
-  .unitgrid{
-    display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;
-  }
-  .unit{
-    aspect-ratio:1;border-radius:10px;border:1px solid var(--line);
-    background:var(--grayBg);color:var(--txt);
-    display:flex;align-items:center;justify-content:center;
-    font-weight:700;font-size:14px;cursor:pointer;position:relative;
-  }
-  .unit:active{transform:scale(.93);}
-  .unit.andamento{background:var(--amberBg);color:#8a5a06;border-color:#f0cf94;}
-  .unit.concluido{background:var(--greenBg);color:#0d6b3c;border-color:#a6e2c1;}
-
-  /* detail screen */
-  .detailhead{padding:14px 16px 10px;}
-  .unitbig{font-size:20px;font-weight:800;color:var(--navy);}
-  .unitprog{display:flex;align-items:center;gap:8px;margin-top:8px;}
-  .unitprog .bar{flex:1;height:7px;background:var(--grayBg);border-radius:4px;overflow:hidden;}
-  .unitprog .bar i{display:block;height:100%;border-radius:4px;background:var(--green);}
-  .unitprog .pct{font-size:12px;color:var(--txt2);font-weight:700;min-width:34px;text-align:right;}
-  .stagelist{padding:6px 16px 40px;display:flex;flex-direction:column;gap:9px;}
-  .stage{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;}
-  .substuff .stage.nested{border-radius:10px;margin:9px 13px;border-color:#eceef4;}
-  .stage.nested .stagename{font-size:13.5px;}
-  .stagehead{display:flex;align-items:center;padding:12px 13px;gap:10px;cursor:pointer;}
-  .stagename{flex:1;font-size:14.5px;font-weight:600;}
-  .stagesub{font-size:11.5px;color:var(--txt3);margin-top:1px;font-weight:400;}
-  .pill{
-    font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:20px;
-    background:var(--grayBg);color:var(--txt2);white-space:nowrap;
-    display:flex;align-items:center;gap:5px;border:none;cursor:pointer;
-  }
-  .pill.andamento{background:var(--amberBg);color:#8a5a06;}
-  .pill.concluido{background:var(--greenBg);color:#0d6b3c;}
-  .chev{color:var(--txt3);font-size:12px;transition:transform .15s;padding:4px;}
-  .stage.open .chev{transform:rotate(90deg);}
-  .substuff{display:none;border-top:1px solid var(--line);}
-  .stage.open .substuff{display:block;}
-  .subrow{display:flex;align-items:center;padding:10px 13px 10px 24px;gap:10px;border-top:1px solid #f0f1f5;}
-  .subrow:first-child{border-top:none;}
-  .subname{flex:1;font-size:13.5px;color:var(--txt);}
-  .cascaderow{display:flex;gap:8px;padding:8px 13px 12px 24px;border-top:1px solid #f0f1f5;}
-  .cascadebtn{
-    flex:1;border:1px solid var(--line);background:var(--bg);color:var(--txt2);
-    border-radius:9px;padding:8px 6px;font-size:12px;font-weight:600;cursor:pointer;
-  }
-  .cascadebtn.ok{color:#0d6b3c;border-color:#a6e2c1;background:var(--greenBg);}
-  .cascadebtn.reset{color:var(--danger);}
-  .cascadebtn:active{opacity:.7;}
-
-  /* toast */
-  .toast{
-    position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);
-    background:var(--navy);color:#fff;padding:10px 18px;border-radius:30px;font-size:13px;
-    opacity:0;pointer-events:none;transition:all .25s;z-index:100;font-weight:600;
-    display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px rgba(0,0,0,.25);
-  }
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-  .toast.err{background:var(--danger);}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0;}
-  .dot.spin{animation:pulse 1s infinite;}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-
-  .loading{padding:40px 20px;text-align:center;color:var(--txt2);font-size:13.5px;}
-  .empty{padding:40px 20px;text-align:center;color:var(--txt3);font-size:13px;}
-</style>
-</head>
-<body>
-<div class="app">
-
-  <header>
-    <div class="brandrow">
-      <div class="brand">SUMMUS<small>ENGENHARIA</small></div>
-      <button class="hbtn" id="btnBack" style="display:none;" aria-label="Voltar">←</button>
-    </div>
-    <div id="headTitle" class="htitle">Medição de Obra</div>
-    <div id="headSub" class="hsub">Selecione o empreendimento</div>
-  </header>
-
-  <!-- HOME -->
-  <div class="screen active" id="screen-home">
-    <div class="home">
-      <div class="home-hint">Toque num empreendimento pra lançar o andamento das unidades.</div>
-      <div id="homeCards"></div>
-    </div>
-  </div>
-
-  <!-- GRID -->
-  <div class="screen" id="screen-grid">
-    <div class="gridwrap">
-      <div class="searchrow">
-        <input type="number" inputmode="numeric" id="searchUnit" placeholder="Ir direto pra unidade nº...">
-      </div>
-      <div class="legend">
-        <span><i style="background:var(--gray)"></i>Não iniciado</span>
-        <span><i style="background:var(--amber)"></i>Em andamento</span>
-        <span><i style="background:var(--green)"></i>Concluído</span>
-      </div>
-      <div id="unitGrid" class="unitgrid"></div>
-      <div id="gridLoading" class="loading" style="display:none;">Carregando status das unidades...</div>
-    </div>
-  </div>
-
-  <!-- DETAIL -->
-  <div class="screen" id="screen-detail">
-    <div class="detailhead">
-      <div class="unitbig" id="unitTitle">Casa 1</div>
-      <div class="unitprog"><div class="bar"><i id="unitBar" style="width:0%"></i></div><div class="pct" id="unitPct">0%</div></div>
-    </div>
-    <div class="stagelist" id="stageList"></div>
-  </div>
-
-</div>
-
-<div class="toast" id="toast"><span class="dot" id="toastDot"></span><span id="toastMsg">Salvo</span></div>
-
-<script>
-/* ======================= CONFIG ======================= */
-const URL_SCRIPT = "https://script.google.com/macros/s/AKfycbyqJDYbqxZG1B86X_bIsRtmRb7W-J-jcPF-n1apeEuBdWPsI3F-_WYcPG6I39u-HPNK/exec";
-
-const EMPREENDIMENTOS = {
-  GOIANIA: { id:"GOIANIA", nome:"Supremo Goiânia", total:72, prefixo:"Casa" },
-  GOIAS:   { id:"GOIAS",   nome:"Supremo Goiás",  total:149, prefixo:"Unidade" }
-};
-
-// Estrutura macro-etapa / sub-etapa real de execução (checklist de campo)
-// Cada nó pode ter "children". Nó sem children = folha (togglável nos 3 status).
-// Nó com children = agrupador (status derivado, com cascata de marcar/resetar tudo).
-function leaf(codigo, nome){ return { codigo, nome, children: [] }; }
-function group(codigo, nome, children){ return { codigo, nome, children }; }
-
-const STAGES = [
-  group("01", "Radier", [
-    leaf("01.01", "Escavação de Blocos"),
-    leaf("01.02", "Colocação de forma metálica"),
-    leaf("01.03", "Infra-elétrica"),
-    leaf("01.04", "Infra-esgoto"),
-    leaf("01.05", "Lastro de brita e lona"),
-    leaf("01.06", "Armação"),
-    leaf("01.07", "Concretagem")
-  ]),
-  group("02", "Estrutura", [
-    group("02.01", "Pavimento Térreo", [
-      leaf("02.01.01", "Armação de Pilares"),
-      leaf("02.01.02", "Fechamento de formas e pilares"),
-      leaf("02.01.03", "Concretagem dos pilares"),
-      leaf("02.01.04", "Fechamento de forma de vigas e lajes + Escada"),
-      leaf("02.01.05", "Armação de vigas e lajes + Escada"),
-      leaf("02.01.06", "Concretagem de vigas e lajes + Escada"),
-      leaf("02.01.07", "Desforma"),
-      leaf("02.01.08", "Retirar as Escoras")
-    ]),
-    group("02.02", "Pavimento Superior", [
-      leaf("02.02.01", "Armação de Pilares"),
-      leaf("02.02.02", "Fechamento de formas e pilares"),
-      leaf("02.02.03", "Concretagem dos pilares"),
-      leaf("02.02.04", "Fechamento de forma de vigas e lajes"),
-      leaf("02.02.05", "Armação de vigas e lajes"),
-      leaf("02.02.06", "Concretagem de vigas e lajes"),
-      leaf("02.02.07", "Desforma"),
-      leaf("02.02.08", "Retirar as Escoras")
-    ])
-  ]),
-  group("03", "Alvenaria", [
-    group("03.01", "Pavimento Térreo", [
-      leaf("03.01.01", "Marcação de alvenaria"),
-      leaf("03.01.02", "Elevação de alvenaria - blocos"),
-      leaf("03.01.03", "Encunhamento"),
-      leaf("03.01.04", "Tratamento de juntas")
-    ]),
-    group("03.02", "Pavimento Superior", [
-      leaf("03.02.01", "Marcação de alvenaria"),
-      leaf("03.02.02", "Elevação de alvenaria - blocos"),
-      leaf("03.02.03", "Encunhamento"),
-      leaf("03.02.04", "Tratamento de juntas")
-    ])
-  ]),
-  group("04", "Contrapiso", [
-    leaf("04.01", "Regularização"),
-    leaf("04.02", "Impermeabilização de banheiro"),
-    leaf("04.03", "Impermeabilização de laje"),
-    leaf("04.04", "Proteção mecânica de laje")
-  ]),
-  group("05", "Infra-Elétrica", [
-    leaf("05.01", "Tubulação e caixa embutida"),
-    leaf("05.02", "Enfiação"),
-    leaf("05.03", "Fechamento de quadros"),
-    leaf("05.04", "Infra energia solar")
-  ]),
-  group("06", "Instalações Hidráulicas", [
-    leaf("06.01", "Água fria e quente"),
-    leaf("06.02", "Fechamento de tubulações aéreas"),
-    leaf("06.03", "Drenos de AC")
-  ]),
-  group("07", "Gesso", [
-    leaf("07.01", "Tabica"),
-    leaf("07.02", "Gesso em placa"),
-    leaf("07.03", "Gesso corrido"),
-    leaf("07.04", "Glassrock fachada")
-  ]),
-  group("08", "Esquadrias Metálicas", [
-    leaf("08.01", "Peitoril"),
-    leaf("08.02", "Janela"),
-    leaf("08.03", "Pele de vidro"),
-    leaf("08.04", "Guarda Corpo")
-  ]),
-  group("09", "Revestimento Cerâmico", [
-    leaf("09.01", "Parede"),
-    leaf("09.02", "Piso"),
-    leaf("09.03", "Revestimento de pedras naturais"),
-    leaf("09.04", "Soleiras"),
-    leaf("09.05", "Rejuntamento")
-  ]),
-  group("10", "Bancadas", [
-    leaf("10.01", "Banheiro"),
-    leaf("10.02", "Cozinha"),
-    leaf("10.03", "Lavabo"),
-    leaf("10.04", "Escada de Granito")
-  ]),
-  group("11", "Pintura Interna", [
-    leaf("11.01", "Emassamento"),
-    leaf("11.02", "1º demão pintura"),
-    leaf("11.03", "2º demão pintura")
-  ]),
-  group("12", "Esquadrias", [
-    leaf("12.01", "Portas de madeira"),
-    leaf("12.02", "Esquadrias metálicas")
-  ]),
-  group("13", "Pintura Externa", [
-    leaf("13.01", "Selador"),
-    leaf("13.02", "Pintura texturizada"),
-    leaf("13.03", "Recorte de pintura")
-  ]),
-  group("14", "Elétrica", [
-    leaf("14.01", "Acabamento elétricos")
-  ]),
-  group("15", "Placas Solares", [
-    leaf("15.01", "Instalação")
-  ]),
-  group("16", "Louças e Metais", [
-    leaf("16.01", "Instalação")
-  ]),
-  group("17", "Limpeza Final", [
-    leaf("17.01", "Interna"),
-    leaf("17.02", "Externa")
-  ]),
-  group("18", "Vistoria Técnica", [
-    leaf("18.01", "Interna"),
-    leaf("18.02", "Externa")
-  ])
-];
-
-// status possíveis para qualquer folha
-const STATUS = ["nao_iniciado","andamento","concluido"];
-const STATUS_LABEL = { nao_iniciado:"Não iniciado", andamento:"Em andamento", concluido:"Concluído" };
-
-/* ======================= ESTADO ======================= */
-// dados[empId][unidade][codigo] = status
-let DADOS = { GOIANIA:{}, GOIAS:{} };
-let LOADED = { GOIANIA:false, GOIAS:false };
-let currentEmp = null;
-let currentUnit = null;
-
-/* ======================= HELPERS ======================= */
-function isLeaf(node){ return !node.children || node.children.length===0; }
-
-// todas as folhas (recursivo) abaixo de um nó — inclui o próprio nó se ele for folha
-function collectLeaves(node){
-  return isLeaf(node) ? [node] : node.children.reduce((acc,c)=>acc.concat(collectLeaves(c)), []);
+  return sheet;
 }
-function allLeaves(){
-  return STAGES.reduce((acc,s)=>acc.concat(collectLeaves(s)), []).map(n=>n.codigo);
-}
-const ALL_LEAVES = allLeaves();
 
-function findNodeByCode(nodes, codigo){
-  for(const n of nodes){
-    if(n.codigo === codigo) return n;
-    if(n.children && n.children.length){
-      const found = findNodeByCode(n.children, codigo);
-      if(found) return found;
+function resposta(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Acha o índice da linha (1-based, já contando header) pra uma combinação
+// Empreendimento + Unidade + CodigoEtapa. Retorna -1 se não existir.
+function acharLinha(data, emp, unidade, codigo) {
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(emp) &&
+        String(data[i][1]) === String(unidade) &&
+        String(data[i][2]) === String(codigo)) {
+      return i; // índice no array "data" (0-based, linha real = i+1)
     }
   }
-  return null;
+  return -1;
 }
 
-function getStatus(emp, unidade, codigo){
-  const u = DADOS[emp] && DADOS[emp][unidade];
-  return (u && u[codigo]) || "nao_iniciado";
-}
-function setStatusLocal(emp, unidade, codigo, status){
-  if(!DADOS[emp][unidade]) DADOS[emp][unidade] = {};
-  DADOS[emp][unidade][codigo] = status;
-}
-// status de qualquer nó: se for folha, é o próprio status salvo; se for agrupador, é derivado das folhas abaixo
-function nodeStatus(emp, unidade, node){
-  if(isLeaf(node)) return getStatus(emp, unidade, node.codigo);
-  const statuses = collectLeaves(node).map(l => getStatus(emp, unidade, l.codigo));
-  if(statuses.every(s => s==="concluido")) return "concluido";
-  if(statuses.some(s => s!=="nao_iniciado")) return "andamento";
-  return "nao_iniciado";
-}
-function unitProgress(emp, unidade){
-  const total = ALL_LEAVES.length;
-  const done = ALL_LEAVES.filter(c => getStatus(emp, unidade, c)==="concluido").length;
-  return Math.round((done/total)*100);
-}
-function unitOverallStatus(emp, unidade){
-  const pct = unitProgress(emp, unidade);
-  if(pct===100) return "concluido";
-  if(pct>0) return "andamento";
-  return "nao_iniciado";
-}
-function empProgress(emp){
-  const total = EMPREENDIMENTOS[emp].total * ALL_LEAVES.length;
-  let done = 0;
-  for(let i=1;i<=EMPREENDIMENTOS[emp].total;i++){
-    done += ALL_LEAVES.filter(c => getStatus(emp, String(i), c)==="concluido").length;
-  }
-  return total ? Math.round((done/total)*100) : 0;
-}
-
-function toast(msg, isErr, spinning){
-  const t = document.getElementById("toast");
-  document.getElementById("toastMsg").textContent = msg;
-  const dot = document.getElementById("toastDot");
-  dot.classList.toggle("spin", !!spinning);
-  t.classList.toggle("err", !!isErr);
-  t.classList.add("show");
-  if(!spinning){
-    clearTimeout(window._toastTimer);
-    window._toastTimer = setTimeout(()=>t.classList.remove("show"), 1800);
+function gravarUm(sheet, data, emp, unidade, codigo, nome, status) {
+  const agora = new Date().toISOString();
+  const idx = acharLinha(data, emp, unidade, codigo);
+  if (idx === -1) {
+    sheet.appendRow([emp, unidade, codigo, nome, status, agora]);
+    data.push([emp, unidade, codigo, nome, status, agora]); // mantém "data" atualizado pra próximas buscas no mesmo request
+  } else {
+    const linhaReal = idx + 1;
+    sheet.getRange(linhaReal, 5).setValue(status);
+    sheet.getRange(linhaReal, 6).setValue(agora);
+    data[idx][4] = status;
+    data[idx][5] = agora;
   }
 }
-function hideToast(){ document.getElementById("toast").classList.remove("show"); }
 
-/* ======================= API ======================= */
-function api(params){
-  const qs = new URLSearchParams(params).toString();
-  return fetch(URL_SCRIPT + "?" + qs).then(r=>r.json());
-}
-function loadEmp(emp){
-  if(LOADED[emp]) return Promise.resolve();
-  document.getElementById("gridLoading").style.display = "block";
-  return api({ action:"load", emp })
-    .then(res=>{
-      if(res.success){
-        const map = {};
-        (res.data||[]).forEach(row=>{
-          if(!map[row.Unidade]) map[row.Unidade] = {};
-          map[row.Unidade][row.CodigoEtapa] = row.Status;
+function doGet(e) {
+  try {
+    const sheet = garantirAba();
+    const action = e.parameter.action;
+
+    // ── SALVAR UM ITEM ──
+    if (action === "save") {
+      const data = sheet.getDataRange().getValues();
+      gravarUm(sheet, data, e.parameter.emp, e.parameter.unidade, e.parameter.codigo, e.parameter.nome, e.parameter.status);
+      return resposta({ success: true });
+    }
+
+    // ── SALVAR VÁRIOS ITENS DE UMA VEZ (cascata de sub-etapas) ──
+    if (action === "saveBatch") {
+      const data = sheet.getDataRange().getValues();
+      const items = JSON.parse(e.parameter.items || "[]");
+      items.forEach(function(it) {
+        gravarUm(sheet, data, e.parameter.emp, e.parameter.unidade, it.codigo, it.nome, it.status);
+      });
+      return resposta({ success: true, count: items.length });
+    }
+
+    // ── CARREGAR (opcionalmente filtrado por empreendimento) ──
+    if (action === "load") {
+      const data = sheet.getDataRange().getValues();
+      if (data.length <= 1) return resposta({ success: true, data: [] });
+      const emp = e.parameter.emp;
+      const rows = [];
+      for (let i = 1; i < data.length; i++) {
+        if (emp && String(data[i][0]) !== String(emp)) continue;
+        rows.push({
+          Empreendimento: data[i][0],
+          Unidade: String(data[i][1]),
+          CodigoEtapa: data[i][2],
+          NomeEtapa: data[i][3],
+          Status: data[i][4]
         });
-        DADOS[emp] = map;
-        LOADED[emp] = true;
       }
-    })
-    .catch(()=> toast("Não deu pra carregar dados salvos. Conferindo offline.", true))
-    .finally(()=> document.getElementById("gridLoading").style.display = "none");
-}
-function saveOne(emp, unidade, codigo, nome, status){
-  setStatusLocal(emp, unidade, codigo, status);
-  renderDetail();
-  toast("Salvando...", false, true);
-  api({ action:"save", emp, unidade, codigo, nome, status })
-    .then(res=>{
-      if(res.success) toast("Salvo"); else toast("Erro ao salvar", true);
-    })
-    .catch(()=> toast("Sem conexão — tente de novo", true));
-}
-function saveBatch(emp, unidade, items){
-  items.forEach(it => setStatusLocal(emp, unidade, it.codigo, it.status));
-  renderDetail();
-  toast("Salvando...", false, true);
-  api({ action:"saveBatch", emp, unidade, items: JSON.stringify(items) })
-    .then(res=>{
-      if(res.success) toast("Salvo"); else toast("Erro ao salvar", true);
-    })
-    .catch(()=> toast("Sem conexão — tente de novo", true));
-}
+      return resposta({ success: true, data: rows });
+    }
 
-/* ======================= NAV ======================= */
-function showScreen(id){
-  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-}
-document.getElementById("btnBack").addEventListener("click", ()=>{
-  if(document.getElementById("screen-detail").classList.contains("active")){
-    openGrid(currentEmp);
-  } else if(document.getElementById("screen-grid").classList.contains("active")){
-    openHome();
-  }
-});
+    return resposta({ success: false, error: "Ação desconhecida" });
 
-function openHome(){
-  currentEmp = null; currentUnit = null;
-  document.getElementById("btnBack").style.display = "none";
-  document.getElementById("headTitle").textContent = "Medição de Obra";
-  document.getElementById("headSub").textContent = "Selecione o empreendimento";
-  renderHome();
-  showScreen("screen-home");
-}
-function openGrid(emp){
-  currentEmp = emp; currentUnit = null;
-  const info = EMPREENDIMENTOS[emp];
-  document.getElementById("btnBack").style.display = "flex";
-  document.getElementById("headTitle").textContent = info.nome;
-  document.getElementById("headSub").textContent = info.total + " unidades";
-  showScreen("screen-grid");
-  loadEmp(emp).then(renderGrid);
-  renderGrid();
-}
-function openDetail(unidade){
-  currentUnit = String(unidade);
-  const info = EMPREENDIMENTOS[currentEmp];
-  document.getElementById("btnBack").style.display = "flex";
-  document.getElementById("headTitle").textContent = info.nome;
-  document.getElementById("headSub").textContent = info.prefixo + " " + unidade;
-  document.getElementById("unitTitle").textContent = info.prefixo + " " + unidade;
-  showScreen("screen-detail");
-  renderDetail();
-}
-
-/* ======================= RENDER ======================= */
-function renderHome(){
-  const wrap = document.getElementById("homeCards");
-  wrap.innerHTML = "";
-  Object.values(EMPREENDIMENTOS).forEach(info=>{
-    const pct = LOADED[info.id] ? empProgress(info.id) : null;
-    const card = document.createElement("div");
-    card.className = "projcard";
-    card.innerHTML = `
-      <div style="flex:1">
-        <div class="pname">${info.nome}</div>
-        <div class="pmeta">${info.total} unidades</div>
-        <div class="projprog"><div class="bar"><i style="width:${pct||0}%"></i></div><div class="pct">${pct===null?"–":pct+"%"}</div></div>
-      </div>
-      <div class="parrow">›</div>`;
-    card.addEventListener("click", ()=> openGrid(info.id));
-    wrap.appendChild(card);
-  });
-}
-
-function renderGrid(){
-  const grid = document.getElementById("unitGrid");
-  const info = EMPREENDIMENTOS[currentEmp];
-  grid.innerHTML = "";
-  for(let i=1;i<=info.total;i++){
-    const u = String(i);
-    const st = unitOverallStatus(currentEmp, u);
-    const btn = document.createElement("div");
-    btn.className = "unit" + (st!=="nao_iniciado" ? " "+st : "");
-    btn.textContent = i;
-    btn.addEventListener("click", ()=> openDetail(u));
-    grid.appendChild(btn);
+  } catch (err) {
+    return resposta({ success: false, error: String(err) });
   }
 }
-
-document.getElementById("searchUnit").addEventListener("keydown", e=>{
-  if(e.key === "Enter"){
-    const v = parseInt(e.target.value,10);
-    const info = EMPREENDIMENTOS[currentEmp];
-    if(v>=1 && v<=info.total){ e.target.value=""; openDetail(String(v)); }
-  }
-});
-
-// Constrói o elemento DOM de um nó da árvore, recursivamente.
-// Folha = linha simples com pill togglável. Agrupador = card com header + filhos + cascata.
-function buildNodeEl(node, emp, unidade, depth, openSet){
-  if(isLeaf(node)){
-    const status = getStatus(emp, unidade, node.codigo);
-    const row = document.createElement("div");
-    row.className = "subrow";
-    row.style.paddingLeft = (24 + Math.max(0, depth-1)*14) + "px";
-    row.innerHTML = `
-      <div class="subname">${node.nome}</div>
-      <button class="pill ${status!=="nao_iniciado"?status:""}" data-act="cycleleaf" data-codigo="${node.codigo}" data-nome="${node.nome}">${STATUS_LABEL[status]}</button>
-    `;
-    return row;
-  }
-
-  const status = nodeStatus(emp, unidade, node);
-  const leafCount = collectLeaves(node).length;
-  const doneCount = collectLeaves(node).filter(l => getStatus(emp,unidade,l.codigo)==="concluido").length;
-
-  const el = document.createElement("div");
-  el.className = "stage" + (openSet.has(node.codigo) ? " open" : "") + (depth>0 ? " nested" : "");
-  el.dataset.codigo = node.codigo;
-
-  const head = document.createElement("div");
-  head.className = "stagehead";
-  head.style.paddingLeft = (13 + depth*14) + "px";
-  head.innerHTML = `
-    <div style="flex:1">
-      <div class="stagename">${node.nome}</div>
-      <div class="stagesub">${doneCount}/${leafCount} concluídas</div>
-    </div>
-    <span class="pill ${status!=="nao_iniciado"?status:""}">${STATUS_LABEL[status]}</span><span class="chev">▸</span>
-  `;
-  el.appendChild(head);
-
-  const box = document.createElement("div");
-  box.className = "substuff";
-  node.children.forEach(child => box.appendChild(buildNodeEl(child, emp, unidade, depth+1, openSet)));
-
-  const casc = document.createElement("div");
-  casc.className = "cascaderow";
-  casc.style.paddingLeft = (13 + depth*14) + "px";
-  casc.innerHTML = `
-    <button class="cascadebtn ok" data-act="marcartudo" data-codigo="${node.codigo}">✓ Marcar tudo concluído</button>
-    <button class="cascadebtn reset" data-act="resettudo" data-codigo="${node.codigo}">↺ Reset</button>
-  `;
-  box.appendChild(casc);
-  el.appendChild(box);
-
-  head.addEventListener("click", (e)=>{
-    if(e.target.closest("[data-act]")) return;
-    el.classList.toggle("open");
-  });
-
-  return el;
-}
-
-function renderDetail(){
-  const list = document.getElementById("stageList");
-  const emp = currentEmp, unidade = currentUnit;
-  const pct = unitProgress(emp, unidade);
-  document.getElementById("unitBar").style.width = pct + "%";
-  document.getElementById("unitPct").textContent = pct + "%";
-
-  // preserve which nós estavam abertos
-  const openSet = new Set(Array.from(list.querySelectorAll(".stage.open")).map(el=>el.dataset.codigo));
-
-  list.innerHTML = "";
-  STAGES.forEach(stage => list.appendChild(buildNodeEl(stage, emp, unidade, 0, openSet)));
-}
-
-// listener único (delegado) pra qualquer pill/cascata em qualquer profundidade
-document.getElementById("stageList").addEventListener("click", (e)=>{
-  const btn = e.target.closest("[data-act]");
-  if(!btn) return;
-  e.stopPropagation();
-  const emp = currentEmp, unidade = currentUnit;
-  const act = btn.dataset.act;
-
-  if(act === "cycleleaf"){
-    const codigo = btn.dataset.codigo, nome = btn.dataset.nome;
-    const cur = getStatus(emp, unidade, codigo);
-    const next = STATUS[(STATUS.indexOf(cur)+1) % STATUS.length];
-    saveOne(emp, unidade, codigo, nome, next);
-  } else if(act === "marcartudo" || act === "resettudo"){
-    const codigo = btn.dataset.codigo;
-    const node = findNodeByCode(STAGES, codigo);
-    if(!node) return;
-    const targetStatus = act === "marcartudo" ? "concluido" : "nao_iniciado";
-    const items = collectLeaves(node).map(l => ({codigo:l.codigo, nome:l.nome, status:targetStatus}));
-    saveBatch(emp, unidade, items);
-  }
-});
-
-/* ======================= INIT ======================= */
-openHome();
-</script>
-</body>
-</html>
