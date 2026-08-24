@@ -262,6 +262,15 @@
   .checkicon{width:20px;height:20px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
   .popupempty{color:#9aa3d9;font-size:13px;padding:10px 0;}
 
+  .confirmwrap{position:fixed;inset:0;background:rgba(10,19,56,.55);z-index:300;display:none;align-items:center;justify-content:center;padding:24px;}
+  .confirmwrap.show{display:flex;}
+  .confirmbox{background:#fff;border-radius:16px;padding:22px 20px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .confirmmsg{font-size:15px;font-weight:600;color:var(--txt);line-height:1.4;margin-bottom:18px;}
+  .confirmbtns{display:flex;gap:10px;}
+  .confirmbtn{flex:1;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;}
+  .confirmbtn.cancel{background:var(--grayBg);color:var(--txt2);}
+  .confirmbtn.ok{background:var(--green);color:#fff;}
+
 </style>
 </head>
 <body>
@@ -347,6 +356,16 @@
     <div id="popupBadgeWrap"></div>
     <div class="popuplabel" id="popupLabel">Etapas concluídas (0)</div>
     <div id="popupList"></div>
+  </div>
+</div>
+
+<div class="confirmwrap" id="confirmWrap">
+  <div class="confirmbox">
+    <div class="confirmmsg" id="confirmMsg"></div>
+    <div class="confirmbtns">
+      <button class="confirmbtn cancel" id="confirmCancel">Cancelar</button>
+      <button class="confirmbtn ok" id="confirmOk">Confirmar</button>
+    </div>
   </div>
 </div>
 
@@ -632,6 +651,29 @@ function acumuladoAte(serie, mesRef){
 function valorDoMes(serie, mesRef){
   const found = serie.find(([m,v]) => m === mesRef);
   return found ? found[1] : 0;
+}
+
+// Confirmação própria do app — não depende do confirm() nativo do navegador,
+// que em alguns contextos (webview dentro de outro app, certos modos de tela
+// cheia) pode ficar bloqueado ou se comportar de forma inconsistente, fazendo
+// o toque simplesmente não fazer nada (sem erro nenhum visível).
+function customConfirm(msg){
+  return new Promise(resolve=>{
+    document.getElementById("confirmMsg").textContent = msg;
+    document.getElementById("confirmWrap").classList.add("show");
+    const okBtn = document.getElementById("confirmOk");
+    const cancelBtn = document.getElementById("confirmCancel");
+    const cleanup = (result)=>{
+      document.getElementById("confirmWrap").classList.remove("show");
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      resolve(result);
+    };
+    const onOk = ()=> cleanup(true);
+    const onCancel = ()=> cleanup(false);
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+  });
 }
 
 function toast(msg, isErr, spinning){
@@ -1002,7 +1044,7 @@ function renderDetail(){
 }
 
 // listener único (delegado) pra qualquer pill/cascata em qualquer profundidade
-document.getElementById("stageList").addEventListener("click", (e)=>{
+document.getElementById("stageList").addEventListener("click", async (e)=>{
   const btn = e.target.closest("[data-act]");
   if(!btn) return;
   e.stopPropagation();
@@ -1015,7 +1057,8 @@ document.getElementById("stageList").addEventListener("click", (e)=>{
     const next = STATUS[(STATUS.indexOf(cur)+1) % STATUS.length];
     // confirmação extra só pra marcar como concluído — evita clique errado virando "conclusão fantasma"
     if(next === "concluido"){
-      if(!confirm(`Confirmar "${nome}" como CONCLUÍDO?`)) return;
+      const ok = await customConfirm(`Confirmar "${nome}" como CONCLUÍDO?`);
+      if(!ok) return;
     }
     saveOne(emp, unidade, codigo, nome, next);
   } else if(act === "marcartudo" || act === "resettudo"){
@@ -1024,12 +1067,14 @@ document.getElementById("stageList").addEventListener("click", (e)=>{
     if(!node) return;
     const targetStatus = act === "marcartudo" ? "concluido" : "nao_iniciado";
     if(targetStatus === "concluido"){
-      if(!confirm(`Confirmar TODAS as sub-etapas de "${node.nome}" como CONCLUÍDAS?`)) return;
+      const ok = await customConfirm(`Confirmar TODAS as sub-etapas de "${node.nome}" como CONCLUÍDAS?`);
+      if(!ok) return;
     }
     const items = collectLeaves(node).map(l => ({codigo:l.codigo, nome:l.nome, status:targetStatus}));
     saveBatch(emp, unidade, items);
   }
 });
+
 
 /* ======================= DASHBOARD: render ======================= */
 function renderDash(){
