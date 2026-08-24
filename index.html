@@ -656,10 +656,16 @@ function api(params){
   const qs = new URLSearchParams({ ...params, _ts: Date.now() }).toString();
   return fetch(URL_SCRIPT + "?" + qs, { cache: "no-store" }).then(r=>r.json());
 }
+let LOADING_PROMISE = { GOIANIA:null, GOIAS:null };
 function loadEmp(emp){
   if(LOADED[emp]) return Promise.resolve();
+  // evita disparar 2 fetches "load" em paralelo pro mesmo empreendimento (acontece
+  // fácil: abrir a grade já chama loadEmp, e entrar direto numa casa chama de novo
+  // antes do primeiro terminar) — sem isso, os dois fetches corriam pra ver quem
+  // "ganha" e sobrescreve o outro.
+  if(LOADING_PROMISE[emp]) return LOADING_PROMISE[emp];
   document.getElementById("gridLoading").style.display = "block";
-  return api({ action:"load", emp })
+  LOADING_PROMISE[emp] = api({ action:"load", emp })
     .then(res=>{
       if(res.success){
         const map = {};
@@ -667,33 +673,65 @@ function loadEmp(emp){
           if(!map[row.Unidade]) map[row.Unidade] = {};
           map[row.Unidade][row.CodigoEtapa] = { status: row.Status, dataConclusao: row.DataConclusao || "" };
         });
-        DADOS[emp] = map;
+        // MERGE, nunca substitui DADOS[emp] inteiro: se a pessoa já tocou em alguma
+        // etapa enquanto esse carregamento ainda tava a caminho (Apps Script pode
+        // demorar uns segundos pra responder), aquele toque local é mais recente
+        // que a fotografia que acabou de chegar do servidor — então o local sempre
+        // vence, nunca é apagado por um load atrasado.
+        Object.keys(map).forEach(unidade=>{
+          if(!DADOS[emp][unidade]) DADOS[emp][unidade] = {};
+          Object.keys(map[unidade]).forEach(codigo=>{
+            if(!DADOS[emp][unidade][codigo]){
+              DADOS[emp][unidade][codigo] = map[unidade][codigo];
+            }
+          });
+        });
         LOADED[emp] = true;
       }
     })
     .catch(()=> toast("Não deu pra carregar dados salvos. Conferindo offline.", true))
-    .finally(()=> document.getElementById("gridLoading").style.display = "none");
+    .finally(()=>{
+      document.getElementById("gridLoading").style.display = "none";
+      LOADING_PROMISE[emp] = null;
+    });
+  return LOADING_PROMISE[emp];
 }
+// conta quantos salvamentos ainda estão em voo — usado pra avisar antes de sair/
+// atualizar a página com algo pendente (ver beforeunload mais abaixo)
+let pendingSaveCount = 0;
 function saveOne(emp, unidade, codigo, nome, status){
   setStatusLocal(emp, unidade, codigo, status);
   renderDetail();
   toast("Salvando...", false, true);
+  pendingSaveCount++;
   api({ action:"save", emp, unidade, codigo, nome, status })
     .then(res=>{
       if(res.success) toast("Salvo"); else toast("Erro ao salvar", true);
     })
-    .catch(()=> toast("Sem conexão — tente de novo", true));
+    .catch(()=> toast("Sem conexão — tente de novo", true))
+    .finally(()=> pendingSaveCount--);
 }
 function saveBatch(emp, unidade, items){
   items.forEach(it => setStatusLocal(emp, unidade, it.codigo, it.status));
   renderDetail();
   toast("Salvando...", false, true);
+  pendingSaveCount++;
   api({ action:"saveBatch", emp, unidade, items: JSON.stringify(items) })
     .then(res=>{
       if(res.success) toast("Salvo"); else toast("Erro ao salvar", true);
     })
-    .catch(()=> toast("Sem conexão — tente de novo", true));
+    .catch(()=> toast("Sem conexão — tente de novo", true))
+    .finally(()=> pendingSaveCount--);
 }
+// se a pessoa tentar sair/atualizar a página com algum salvamento ainda em voo,
+// avisa antes — é exatamente o cenário de "marquei e dei F5 rápido demais" que
+// cancela a chamada pro servidor no meio do caminho e perde o registro
+window.addEventListener("beforeunload", (e)=>{
+  if(pendingSaveCount > 0){
+    e.preventDefault();
+    e.returnValue = "";
+  }
+});
 
 /* ======================= NAV ======================= */
 function showScreen(id){
