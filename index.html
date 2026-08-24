@@ -726,6 +726,11 @@ function outboxRemove(id){
 function novoId(){
   return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 }
+// evita reenviar o mesmo item da fila duas vezes em paralelo — sem isso, se
+// "load" e "online" dispararem quase juntos (ex: página abre bem no instante
+// que a conexão volta), os dois calls de outboxRetry() rodavam ao mesmo tempo
+// e mandavam o MESMO item pro servidor duas vezes, causando linha duplicada
+const emVoo = new Set();
 // tenta reenviar tudo que ficou pendente — chamado ao abrir a página e quando a
 // conexão volta depois de ficar offline
 function outboxRetry(){
@@ -733,6 +738,7 @@ function outboxRetry(){
   if(!pendentes.length) return;
   let precisaRedesenhar = false;
   pendentes.forEach(it=>{
+    if(emVoo.has(it.id)) return; // já tem um reenvio desse item em andamento
     // reaplica local também (protegido pelo merge do loadEmp, não é sobrescrito depois)
     if(DADOS[it.emp]){
       if(it.type === "save"){
@@ -745,9 +751,11 @@ function outboxRetry(){
     const params = it.type === "save"
       ? { action:"save", emp:it.emp, unidade:it.unidade, codigo:it.codigo, nome:it.nome, status:it.status }
       : { action:"saveBatch", emp:it.emp, unidade:it.unidade, items: JSON.stringify(it.items) };
+    emVoo.add(it.id);
     api(params)
       .then(res=>{ if(res.success) outboxRemove(it.id); })
-      .catch(()=>{}); // continua na fila, tenta de novo na próxima oportunidade
+      .catch(()=>{}) // continua na fila, tenta de novo na próxima oportunidade
+      .finally(()=> emVoo.delete(it.id));
   });
   if(precisaRedesenhar){
     if(document.getElementById("screen-detail").classList.contains("active")) renderDetail();
