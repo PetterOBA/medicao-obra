@@ -656,6 +656,65 @@ function api(params){
   const qs = new URLSearchParams({ ...params, _ts: Date.now() }).toString();
   return fetch(URL_SCRIPT + "?" + qs, { cache: "no-store" }).then(r=>r.json());
 }
+// ── Fila de reenvio (outbox) ──
+// Cada marcação pendente fica registrada aqui ANTES de tentar enviar pro servidor.
+// Só sai da fila quando o servidor confirma "success". Se a página for recarregada
+// no meio do caminho (F5 rápido demais, sinal ruim no canteiro, etc.) o pedido de
+// rede é cancelado, mas o registro continua salvo no celular — e assim que a página
+// carrega de novo, ele é reenviado sozinho. Isso resolve o problema de forma mais
+// confiável do que só avisar antes de sair, porque a maioria dos navegadores de
+// celular ignora esse aviso mesmo assim.
+const OUTBOX_KEY = "medicao_outbox_v1";
+function outboxRead(){
+  try{ return JSON.parse(localStorage.getItem(OUTBOX_KEY) || "[]"); }
+  catch(e){ return []; }
+}
+function outboxWrite(arr){
+  try{ localStorage.setItem(OUTBOX_KEY, JSON.stringify(arr)); }
+  catch(e){ /* localStorage indisponível (modo privado etc.) — segue sem fila */ }
+}
+function outboxAdd(item){
+  const arr = outboxRead();
+  arr.push(item);
+  outboxWrite(arr);
+}
+function outboxRemove(id){
+  outboxWrite(outboxRead().filter(it => it.id !== id));
+}
+function novoId(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+// tenta reenviar tudo que ficou pendente — chamado ao abrir a página e quando a
+// conexão volta depois de ficar offline
+function outboxRetry(){
+  const pendentes = outboxRead();
+  if(!pendentes.length) return;
+  let precisaRedesenhar = false;
+  pendentes.forEach(it=>{
+    // reaplica local também (protegido pelo merge do loadEmp, não é sobrescrito depois)
+    if(DADOS[it.emp]){
+      if(it.type === "save"){
+        setStatusLocal(it.emp, it.unidade, it.codigo, it.status);
+      } else {
+        it.items.forEach(x => setStatusLocal(it.emp, it.unidade, x.codigo, x.status));
+      }
+      if(currentEmp === it.emp) precisaRedesenhar = true;
+    }
+    const params = it.type === "save"
+      ? { action:"save", emp:it.emp, unidade:it.unidade, codigo:it.codigo, nome:it.nome, status:it.status }
+      : { action:"saveBatch", emp:it.emp, unidade:it.unidade, items: JSON.stringify(it.items) };
+    api(params)
+      .then(res=>{ if(res.success) outboxRemove(it.id); })
+      .catch(()=>{}); // continua na fila, tenta de novo na próxima oportunidade
+  });
+  if(precisaRedesenhar){
+    if(document.getElementById("screen-detail").classList.contains("active")) renderDetail();
+    if(document.getElementById("screen-grid").classList.contains("active")) renderGrid();
+  }
+}
+window.addEventListener("load", outboxRetry);
+window.addEventListener("online", outboxRetry);
+
 let LOADING_PROMISE = { GOIANIA:null, GOIAS:null };
 function loadEmp(emp){
   if(LOADED[emp]) return Promise.resolve();
@@ -696,38 +755,37 @@ function loadEmp(emp){
     });
   return LOADING_PROMISE[emp];
 }
-// conta quantos salvamentos ainda estão em voo — usado pra avisar antes de sair/
-// atualizar a página com algo pendente (ver beforeunload mais abaixo)
-let pendingSaveCount = 0;
 function saveOne(emp, unidade, codigo, nome, status){
   setStatusLocal(emp, unidade, codigo, status);
   renderDetail();
   toast("Salvando...", false, true);
-  pendingSaveCount++;
+  const id = novoId();
+  outboxAdd({ id, type:"save", emp, unidade, codigo, nome, status });
   api({ action:"save", emp, unidade, codigo, nome, status })
     .then(res=>{
-      if(res.success) toast("Salvo"); else toast("Erro ao salvar", true);
+      if(res.success){ outboxRemove(id); toast("Salvo"); }
+      else toast("Erro ao salvar", true);
     })
-    .catch(()=> toast("Sem conexão — tente de novo", true))
-    .finally(()=> pendingSaveCount--);
+    .catch(()=> toast("Sem conexão — vai reenviar sozinho quando a página recarregar", true));
 }
 function saveBatch(emp, unidade, items){
   items.forEach(it => setStatusLocal(emp, unidade, it.codigo, it.status));
   renderDetail();
   toast("Salvando...", false, true);
-  pendingSaveCount++;
+  const id = novoId();
+  outboxAdd({ id, type:"saveBatch", emp, unidade, items });
   api({ action:"saveBatch", emp, unidade, items: JSON.stringify(items) })
     .then(res=>{
-      if(res.success) toast("Salvo"); else toast("Erro ao salvar", true);
+      if(res.success){ outboxRemove(id); toast("Salvo"); }
+      else toast("Erro ao salvar", true);
     })
-    .catch(()=> toast("Sem conexão — tente de novo", true))
-    .finally(()=> pendingSaveCount--);
+    .catch(()=> toast("Sem conexão — vai reenviar sozinho quando a página recarregar", true));
 }
-// se a pessoa tentar sair/atualizar a página com algum salvamento ainda em voo,
-// avisa antes — é exatamente o cenário de "marquei e dei F5 rápido demais" que
-// cancela a chamada pro servidor no meio do caminho e perde o registro
+// se a pessoa tentar sair/atualizar a página com algo em voo, tenta avisar — funciona
+// em desktop; em celular a maioria dos navegadores ignora, por isso a fila acima é
+// a proteção que realmente importa
 window.addEventListener("beforeunload", (e)=>{
-  if(pendingSaveCount > 0){
+  if(outboxRead().length > 0){
     e.preventDefault();
     e.returnValue = "";
   }
