@@ -206,13 +206,28 @@
   .metatablehead{margin-bottom:14px;}
   .metatabletitle{font-size:16px;font-weight:800;color:#fff;}
   .metatablesub{font-size:11.5px;color:#c7cdea;margin-top:2px;}
-  .comparativogrid{display:flex;gap:10px;}
-  .comparativobox{flex:1;text-align:center;padding:14px 6px;background:rgba(255,255,255,.07);border-radius:10px;}
-  .comparativoval{font-size:26px;font-weight:800;}
+  .comparativogrid{display:flex;gap:8px;}
+  .comparativobox{flex:1;text-align:center;padding:12px 4px;background:rgba(255,255,255,.07);border-radius:10px;position:relative;min-width:0;}
+  .comparativoval{font-size:23px;font-weight:800;}
   .comparativoval.ok{color:var(--green);}
   .comparativoval.late{color:#ff8a8a;}
-  .comparativolabel{font-size:10.5px;color:#c7cdea;text-transform:uppercase;letter-spacing:.03em;margin-top:2px;}
+  .comparativolabel{font-size:9.5px;color:#c7cdea;text-transform:uppercase;letter-spacing:.02em;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .comparativostatus{margin-top:12px;text-align:center;}
+  .comparativomensal{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.12);font-size:11px;color:#c7cdea;text-align:center;}
+  .comparativomensal b{color:#fff;}
+  .comparativoboxmedido{padding-top:16px;}
+  .medidoeditbtn{
+    position:absolute;top:5px;right:5px;width:18px;height:18px;border-radius:5px;border:none;
+    background:rgba(255,255,255,.15);color:#fff;font-size:10px;cursor:pointer;padding:0;line-height:1;
+  }
+  .medidobox{max-width:340px;}
+  .medidotitle{font-size:14px;font-weight:700;color:var(--txt);margin-bottom:14px;}
+  .medidogroup{margin-bottom:12px;}
+  .medidolabel{font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.03em;margin-bottom:5px;}
+  .medidorow{display:flex;gap:8px;}
+  .medidoinput{border:1px solid var(--line);border-radius:8px;padding:8px 9px;font-size:12.5px;font-family:inherit;}
+  .medidoinput:not(.medidoinputpct){flex:1;}
+  .medidoinputpct{width:92px;}
   table.metatable{width:100%;border-collapse:collapse;}
   .metatable thead th{
     font-size:9.5px;color:#c7cdea;font-weight:700;text-transform:uppercase;letter-spacing:.03em;
@@ -372,6 +387,30 @@
     <div class="confirmbtns">
       <button class="confirmbtn cancel" id="confirmCancel">Cancelar</button>
       <button class="confirmbtn ok" id="confirmOk">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirmwrap" id="medidoWrap">
+  <div class="confirmbox medidobox">
+    <div class="medidotitle">Atualizar Medido</div>
+    <div class="medidogroup">
+      <div class="medidolabel">Supremo Goiânia</div>
+      <div class="medidorow">
+        <input type="month" id="medidoMesGoiania" class="medidoinput">
+        <input type="number" step="0.01" placeholder="% acumulado" id="medidoPctGoiania" class="medidoinput medidoinputpct">
+      </div>
+    </div>
+    <div class="medidogroup">
+      <div class="medidolabel">Supremo Goiás</div>
+      <div class="medidorow">
+        <input type="month" id="medidoMesGoias" class="medidoinput">
+        <input type="number" step="0.01" placeholder="% acumulado" id="medidoPctGoias" class="medidoinput medidoinputpct">
+      </div>
+    </div>
+    <div class="confirmbtns">
+      <button class="confirmbtn cancel" id="medidoCancel">Cancelar</button>
+      <button class="confirmbtn ok" id="medidoSalvar">Salvar</button>
     </div>
   </div>
 </div>
@@ -947,6 +986,47 @@ function openDetail(unidade){
     if(currentUnit === unidade) renderDetail();
   });
 }
+let MEDIDO_HIST = { GOIANIA:[], GOIAS:[] };
+let MEDIDO_LOADED = false;
+let MEDIDO_LOADING = null;
+function loadMedido(){
+  if(MEDIDO_LOADED) return Promise.resolve();
+  if(MEDIDO_LOADING) return MEDIDO_LOADING;
+  MEDIDO_LOADING = api({ action:"loadMedido" })
+    .then(res=>{
+      if(res.success){
+        const hist = { GOIANIA:[], GOIAS:[] };
+        (res.data||[]).forEach(row=>{
+          if(hist[row.Empreendimento]) hist[row.Empreendimento].push({ mes: row.Mes, pct: Number(row.PercentualAcumulado) });
+        });
+        MEDIDO_HIST = hist;
+        MEDIDO_LOADED = true;
+      }
+    })
+    .catch(()=>{})
+    .finally(()=>{ MEDIDO_LOADING = null; });
+  return MEDIDO_LOADING;
+}
+// pega o último mês registrado (por ordem de gravação — corrige duplicata,
+// já que sempre acrescentamos linha nova em vez de sobrescrever) e calcula
+// quanto foi medido só naquele mês (diferença pro mês anterior no histórico)
+function medidoUltimos(emp){
+  const hist = MEDIDO_HIST[emp] || [];
+  if(!hist.length) return null;
+  const porMes = {};
+  hist.forEach(r => porMes[r.mes] = r.pct); // última gravação de cada mês vence
+  const meses = Object.keys(porMes).sort();
+  const ultimoMes = meses[meses.length-1];
+  const penultimoMes = meses.length>1 ? meses[meses.length-2] : null;
+  const acumulado = porMes[ultimoMes];
+  const doMes = penultimoMes!=null ? (acumulado - porMes[penultimoMes]) : acumulado;
+  return { mes: ultimoMes, acumulado, doMes };
+}
+function mesLabelDeChave(chaveAnoMes){
+  const [ano, mes] = chaveAnoMes.split("-");
+  return MESES_PT[Number(mes)-1] + "/" + ano.slice(2);
+}
+
 function openDash(emp){
   currentEmp = emp; currentUnit = null;
   const info = EMPREENDIMENTOS[emp];
@@ -955,8 +1035,8 @@ function openDash(emp){
   document.getElementById("headSub").textContent = info.total + " unidades · acompanhamento por etapa";
   document.getElementById("dashWrap").innerHTML = '<div class="loading">Carregando dados...</div>';
   showScreen("screen-dash");
-  loadEmp(emp).then(renderDash);
-  if(LOADED[emp]) renderDash();
+  Promise.all([loadEmp(emp), loadMedido()]).then(renderDash);
+  if(LOADED[emp] && MEDIDO_LOADED) renderDash();
 }
 
 /* ======================= RENDER ======================= */
@@ -1146,17 +1226,22 @@ function renderDash(){
     if(st==="concluido") nConcl++; else if(st==="andamento") nAnd++; else nNao++;
   }
 
-  // comparativo financeiro x campo — os dois agora medem "% do trabalho feito",
+  // comparativo meta x campo — os dois agora medem "% do trabalho feito",
   // sem depender de casa fechar inteira nem de mapear etapa por etapa
   const hoje = new Date();
   const mesAtualKey = mesKey(hoje);
   const campoPct = campoPercentPonderado(currentEmp);
   const metaPct = acumuladoAte(META_GERAL[currentEmp] || [], mesAtualKey);
+  const metaDoMes = valorDoMes(META_GERAL[currentEmp] || [], mesAtualKey);
   const noPrazo = campoPct >= metaPct;
   const diffPontos = Math.round(Math.abs(campoPct - metaPct));
   const statusTxt = noPrazo
     ? "No prazo"
     : `Atrasado em ${diffPontos} ${diffPontos===1?'ponto':'pontos'}`;
+
+  // medido — vem de um relatório mensal digitado à mão (nunca é do mês atual,
+  // sempre atrasa um pouco porque alguém ainda precisa compilar e mandar)
+  const medido = medidoUltimos(currentEmp);
 
   // progresso real por etapa (% ponderado de sub-etapas, não casa inteira)
   const etapaProgresso = STAGES.map(st=>{
@@ -1174,15 +1259,24 @@ function renderDash(){
         <div class="comparativogrid">
           <div class="comparativobox">
             <div class="comparativoval">${Math.round(metaPct)}%</div>
-            <div class="comparativolabel">Financeiro</div>
+            <div class="comparativolabel">Meta</div>
           </div>
           <div class="comparativobox">
             <div class="comparativoval ${noPrazo?'ok':'late'}">${Math.round(campoPct)}%</div>
             <div class="comparativolabel">Campo</div>
           </div>
+          <div class="comparativobox comparativoboxmedido">
+            <button class="medidoeditbtn" id="medidoEditBtn">✎</button>
+            <div class="comparativoval">${medido ? Math.round(medido.acumulado)+"%" : "—"}</div>
+            <div class="comparativolabel">Medido${medido ? " · "+mesLabelDeChave(medido.mes) : ""}</div>
+          </div>
         </div>
         <div class="comparativostatus">
           <span class="statuschip ${noPrazo?'ok':'late'}">${statusTxt}</span>
+        </div>
+        <div class="comparativomensal">
+          Meta de ${mesLabel(hoje)}: <b>${metaDoMes.toFixed(2)}%</b>
+          ${medido ? ` · Medido de ${mesLabelDeChave(medido.mes)}: <b>${medido.doMes.toFixed(2)}%</b>` : ""}
         </div>
       </div>
     </div>
@@ -1305,10 +1399,54 @@ document.getElementById("popupWrap").addEventListener("click", (e)=>{
 
 // accordion das sub-etapas — delegado no dashWrap (persiste entre renders, só o innerHTML muda)
 document.getElementById("dashWrap").addEventListener("click", (e)=>{
+  const btnMedido = e.target.closest("#medidoEditBtn");
+  if(btnMedido){ abrirMedidoModal(); return; }
   const row = e.target.closest(".macrorow");
   if(!row) return;
   const group = row.closest(".macrogroup");
   if(group) group.classList.toggle("open");
+});
+
+/* ======================= DASHBOARD: modal de Medido ======================= */
+function abrirMedidoModal(){
+  // pré-preenche com o último mês/valor já salvo de cada empreendimento, se tiver —
+  // facilita corrigir um erro de digitação sem precisar redigitar tudo
+  const ultGoiania = medidoUltimos("GOIANIA");
+  const ultGoias = medidoUltimos("GOIAS");
+  document.getElementById("medidoMesGoiania").value = ultGoiania ? ultGoiania.mes : "";
+  document.getElementById("medidoPctGoiania").value = ultGoiania ? ultGoiania.acumulado : "";
+  document.getElementById("medidoMesGoias").value = ultGoias ? ultGoias.mes : "";
+  document.getElementById("medidoPctGoias").value = ultGoias ? ultGoias.acumulado : "";
+  document.getElementById("medidoWrap").classList.add("show");
+}
+document.getElementById("medidoCancel").addEventListener("click", ()=>{
+  document.getElementById("medidoWrap").classList.remove("show");
+});
+document.getElementById("medidoWrap").addEventListener("click", (e)=>{
+  if(e.target.id === "medidoWrap") e.currentTarget.classList.remove("show");
+});
+document.getElementById("medidoSalvar").addEventListener("click", ()=>{
+  const mesGoiania = document.getElementById("medidoMesGoiania").value;
+  const pctGoiania = document.getElementById("medidoPctGoiania").value;
+  const mesGoias = document.getElementById("medidoMesGoias").value;
+  const pctGoias = document.getElementById("medidoPctGoias").value;
+  if(!mesGoiania && !mesGoias){
+    toast("Preenche pelo menos um empreendimento", true);
+    return;
+  }
+  document.getElementById("medidoWrap").classList.remove("show");
+  toast("Salvando...", false, true);
+  api({ action:"saveMedido", mesGoiania, pctGoiania, mesGoias, pctGoias })
+    .then(res=>{
+      if(res.success){
+        MEDIDO_LOADED = false; // força recarregar do zero pra pegar o que acabou de entrar
+        return loadMedido();
+      } else {
+        toast("Erro ao salvar", true);
+      }
+    })
+    .then(()=>{ toast("Salvo"); renderDash(); })
+    .catch(()=> toast("Sem conexão — tente de novo", true));
 });
 
 /* ======================= DASHBOARD: mapa — pinch-zoom + pan ======================= */
