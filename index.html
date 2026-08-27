@@ -1484,7 +1484,7 @@ document.getElementById("medidoSalvar").addEventListener("click", ()=>{
 
 /* ======================= DASHBOARD: mapa — pinch-zoom + pan ======================= */
 let mapScale = 1, mapX = 0, mapY = 0;
-const MAP_MIN = 1, MAP_MAX = 4;
+const MAP_MIN = 1, MAP_MAX = 6;
 let panState = null;     // {startX,startY,startMapX,startMapY}
 let pinchState = null;   // {startDist,startScale,midX,midY,startMapX,startMapY}
 
@@ -1503,9 +1503,17 @@ function applyMapTransform(){
   if(!inner) return;
   clampMapPosition();
   inner.style.transform = `translate(${mapX}px, ${mapY}px) scale(${mapScale})`;
-  // mostra o número da casa só depois de um certo nível de zoom — no zoom padrão
-  // (visão geral do terreno) ficaria tudo grudado e ilegível
-  inner.classList.toggle("zoomed", mapScale >= 1.8);
+  // contra-escala cada marcador (ponto + número) pra manter tamanho fixo na tela
+  // conforme o mapa dá zoom. Sem isso, o marcador cresce junto com a imagem —
+  // a distância entre duas casas vizinhas cresce na mesma proporção que o
+  // tamanho do texto, e a sobreposição nunca melhora não importa quanto zoom
+  // se dê. Contra-escalando, só a DISTÂNCIA entre pontos cresce com o zoom,
+  // que é o que realmente separa números de casas vizinhas.
+  const inv = 1/mapScale;
+  document.querySelectorAll(".geomark").forEach(m=>{
+    m.style.transform = `translate(-50%,-50%) scale(${inv})`;
+  });
+  inner.classList.toggle("zoomed", mapScale >= 2.2);
 }
 function resetMapView(){
   mapScale = 1; mapX = 0; mapY = 0;
