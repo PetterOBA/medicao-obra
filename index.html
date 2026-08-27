@@ -722,6 +722,25 @@ function campoPercentPonderado(emp){
   return info.total ? (somaFracoes/info.total)*100 : 0;
 }
 
+// % ponderado só do que foi concluído DENTRO de um mês específico — usa a
+// DataConclusao que cada sub-etapa já grava (sem precisar de "retrato" nenhum
+// salvo à parte). Funciona até pra meses passados, já que a data fica guardada
+// pra sempre enquanto a sub-etapa continuar concluída.
+function campoPercentDoMes(emp, mesRef){
+  const info = EMPREENDIMENTOS[emp];
+  let somaFracoes = 0;
+  for(let i=1;i<=info.total;i++){
+    const u = String(i);
+    Object.keys(PESOS).forEach(codigo=>{
+      if(getStatus(emp, u, codigo) === "concluido"){
+        const dc = getDataConclusao(emp, u, codigo);
+        if(dc && dc.slice(0,7) === mesRef) somaFracoes += PESOS[codigo];
+      }
+    });
+  }
+  return info.total ? (somaFracoes/info.total)*100 : 0;
+}
+
 // mesma lógica, mas escopada numa única macro-etapa — dá o % de progresso
 // daquela etapa especificamente (0 a 100%), pra lista "Progresso por etapa"
 function etapaPercentPonderado(emp, macroNode){
@@ -1242,6 +1261,7 @@ function renderDash(){
   // medido — vem de um relatório mensal digitado à mão (nunca é do mês atual,
   // sempre atrasa um pouco porque alguém ainda precisa compilar e mandar)
   const medido = medidoUltimos(currentEmp);
+  const campoDoMes = campoPercentDoMes(currentEmp, mesAtualKey);
 
   // progresso real por etapa (% ponderado de sub-etapas, não casa inteira)
   const etapaProgresso = STAGES.map(st=>{
@@ -1276,7 +1296,8 @@ function renderDash(){
         </div>
         <div class="comparativomensal">
           Meta de ${mesLabel(hoje)}: <b>${metaDoMes.toFixed(2)}%</b>
-          ${medido ? ` · Medido de ${mesLabelDeChave(medido.mes)}: <b>${medido.doMes.toFixed(2)}%</b>` : ""}
+          · Campo de ${mesLabel(hoje)}: <b>${campoDoMes.toFixed(2)}%</b>
+          ${medido ? `<br>Medido de ${mesLabelDeChave(medido.mes)}: <b>${medido.doMes.toFixed(2)}%</b>` : ""}
         </div>
       </div>
     </div>
