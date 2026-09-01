@@ -1415,12 +1415,11 @@ function salvarMetasSub(){
     .then(res=>{
       if(!res.success){ toast("Erro ao salvar", true); return; }
       METASSUB_LOADED = false;
-      return loadMetasSub();
-    })
-    .then(()=>{
-      toast("Salvo");
-      metasSubEditMode = false;
-      renderMetasTab();
+      return loadMetasSub().then(()=>{
+        toast("Salvo");
+        metasSubEditMode = false;
+        renderMetasTab();
+      });
     })
     .catch(()=> toast("Sem conexão — tente de novo", true));
 }
