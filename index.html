@@ -167,6 +167,12 @@
   .gateerr{color:var(--danger);font-size:12.5px;margin-top:12px;font-weight:600;}
 
   /* ===== dashboard ===== */
+  .dashtabs{display:flex;gap:6px;padding:14px 16px 0;}
+  .dashtabbtn{
+    flex:1;padding:10px;border:none;border-radius:9px;background:var(--grayBg);
+    color:var(--txt2);font-weight:700;font-size:13px;cursor:pointer;
+  }
+  .dashtabbtn.active{background:var(--navy);color:#fff;}
   .dashwrap{padding:18px 16px 40px;flex:1;}
   .dashsection{margin-bottom:26px;}
   .dashsectiontitle{font-size:12.5px;font-weight:700;color:var(--txt2);text-transform:uppercase;letter-spacing:.04em;margin:0 2px 10px;}
@@ -194,6 +200,27 @@
   .subetapaline{padding:7px 0;}
   .subetapaline+.subetapaline{border-top:1px dashed var(--line);}
   .subetapaname{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--txt2);margin-bottom:4px;gap:8px;}
+  .metastabhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .metasokbtn{background:var(--green);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;}
+  .metaseditbtn{background:var(--navy2);color:#fff;border:none;border-radius:8px;width:32px;height:32px;font-size:14px;cursor:pointer;flex-shrink:0;}
+  .metaseditgridhead,.metaseditgridrow,.metasreadhead,.metasreadrow{
+    display:grid;grid-template-columns:1fr 44px 44px 44px;gap:4px 6px;align-items:center;
+  }
+  .metaseditgridhead span,.metasreadhead span{
+    font-size:9px;color:var(--txt3);font-weight:700;text-transform:uppercase;text-align:center;
+  }
+  .metaseditgridhead span:first-child,.metasreadhead span:first-child{visibility:hidden;}
+  .metaseditgridrow{padding:4px 0;}
+  .metaseditgridrow span{font-size:11px;color:var(--txt2);}
+  .metaseditgridrow input{
+    width:100%;font-size:11px;text-align:center;border:1px solid var(--line);border-radius:5px;
+    padding:4px 2px;font-family:inherit;color:var(--txt);
+  }
+  .metasreadgroup{background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
+  .metasreadtitle{font-size:13px;font-weight:700;color:var(--txt);margin-bottom:6px;}
+  .metasreadrow{padding:5px 0;border-top:1px solid var(--grayBg);}
+  .metasreadrow span{font-size:11px;color:var(--txt);}
+  .metasreadrow span:not(:first-child){text-align:center;font-weight:700;color:var(--txt2);}
   .subetapaname span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .subetapaname span:last-child{font-weight:700;color:var(--txt);flex-shrink:0;}
   .subetapabar{height:4px;background:var(--grayBg);border-radius:3px;overflow:hidden;}
@@ -373,6 +400,10 @@
 
   <!-- DASHBOARD -->
   <div class="screen" id="screen-dash">
+    <div class="dashtabs" id="dashTabs">
+      <button class="dashtabbtn active" data-tab="geral">Visão Geral</button>
+      <button class="dashtabbtn" data-tab="metas">Metas</button>
+    </div>
     <div class="dashwrap" id="dashWrap">
       <div class="loading">Carregando dados...</div>
     </div>
@@ -1057,17 +1088,71 @@ function mesLabelDeChave(chaveAnoMes){
   return MESES_PT[Number(mes)-1] + "/" + ano.slice(2);
 }
 
+/* ======================= METAS POR SUB-ETAPA (manual) ======================= */
+let METASSUB_HIST = { GOIANIA:{}, GOIAS:{} }; // METASSUB_HIST[emp][codigo][mes] = valor
+let METASSUB_LOADED = false;
+let METASSUB_LOADING = null;
+function loadMetasSub(){
+  if(METASSUB_LOADED) return Promise.resolve();
+  if(METASSUB_LOADING) return METASSUB_LOADING;
+  METASSUB_LOADING = api({ action:"loadMetasSub" })
+    .then(res=>{
+      if(res.success){
+        const hist = { GOIANIA:{}, GOIAS:{} };
+        (res.data||[]).forEach(row=>{
+          if(!hist[row.Empreendimento]) return;
+          if(!hist[row.Empreendimento][row.CodigoSubetapa]) hist[row.Empreendimento][row.CodigoSubetapa] = {};
+          hist[row.Empreendimento][row.CodigoSubetapa][row.Mes] = Number(row.ValorMeta);
+        });
+        METASSUB_HIST = hist;
+        METASSUB_LOADED = true;
+      }
+    })
+    .catch(()=>{})
+    .finally(()=>{ METASSUB_LOADING = null; });
+  return METASSUB_LOADING;
+}
+// os 3 meses trabalhados: atual + próximos 2 — sempre calculado na hora (nunca
+// hardcoded), então vira o mês sozinho quando o calendário virar
+function proximosTresMeses(){
+  const hoje = new Date();
+  const out = [];
+  for(let i=0;i<3;i++){
+    const d = new Date(hoje.getFullYear(), hoje.getMonth()+i, 1);
+    out.push({ chave: mesKey(d), label: mesLabelDeChave(mesKey(d)) });
+  }
+  return out;
+}
+
+let dashTab = "geral";
+let metasSubEditMode = false;
+
 function openDash(emp){
   currentEmp = emp; currentUnit = null;
+  dashTab = "geral"; metasSubEditMode = false;
+  document.querySelectorAll(".dashtabbtn").forEach(b=> b.classList.toggle("active", b.dataset.tab==="geral"));
   const info = EMPREENDIMENTOS[emp];
   document.getElementById("btnBack").style.display = "flex";
   document.getElementById("headTitle").textContent = "Dashboard — " + info.nome;
   document.getElementById("headSub").textContent = info.total + " unidades · acompanhamento por etapa";
   document.getElementById("dashWrap").innerHTML = '<div class="loading">Carregando dados...</div>';
   showScreen("screen-dash");
-  Promise.all([loadEmp(emp), loadMedido()]).then(renderDash);
-  if(LOADED[emp] && MEDIDO_LOADED) renderDash();
+  Promise.all([loadEmp(emp), loadMedido(), loadMetasSub()]).then(renderDashAtual);
+  if(LOADED[emp] && MEDIDO_LOADED && METASSUB_LOADED) renderDashAtual();
 }
+// escolhe qual dos dois conteúdos desenhar, sem recarregar dado nenhum de novo
+function renderDashAtual(){
+  if(dashTab === "metas") renderMetasTab();
+  else renderDash();
+}
+document.getElementById("dashTabs").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".dashtabbtn");
+  if(!btn) return;
+  dashTab = btn.dataset.tab;
+  metasSubEditMode = false;
+  document.querySelectorAll(".dashtabbtn").forEach(b=> b.classList.toggle("active", b===btn));
+  renderDashAtual();
+});
 
 /* ======================= RENDER ======================= */
 function renderMenu(){
@@ -1242,6 +1327,104 @@ document.getElementById("stageList").addEventListener("click", async (e)=>{
 
 
 /* ======================= DASHBOARD: render ======================= */
+/* ======================= METAS POR SUB-ETAPA — TAB ======================= */
+function renderGrupoEdicao(st, meses, metasEmp){
+  const folhas = subEtapasFlat(st);
+  return `
+    <div class="macrogroup">
+      <div class="macrorow" data-macro="${st.codigo}">
+        <div class="mname"><div class="mleft"><span class="chevicon">▸</span><span>${st.nome}</span></div></div>
+      </div>
+      <div class="macrosubs">
+        <div class="metaseditgridhead">
+          <span></span>${meses.map(m=>`<span>${m.label}</span>`).join("")}
+        </div>
+        ${folhas.map(f=>{
+          const valores = metasEmp[f.codigo] || {};
+          return `
+          <div class="metaseditgridrow">
+            <span>${f.nome}</span>
+            ${meses.map(m => `<input type="number" min="0" inputmode="numeric" data-codigo="${f.codigo}" data-mes="${m.chave}" value="${valores[m.chave] ?? ''}" placeholder="—">`).join("")}
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderMetasTab(){
+  const wrap = document.getElementById("dashWrap");
+  const meses = proximosTresMeses();
+  const metasEmp = METASSUB_HIST[currentEmp] || {};
+
+  if(metasSubEditMode){
+    wrap.innerHTML = `
+      <div class="dashsection">
+        <div class="metastabhead">
+          <div class="dashsectiontitle" style="margin:0;">Metas por Sub-etapa</div>
+          <button class="metasokbtn" id="metasOkBtn">OK</button>
+        </div>
+        ${STAGES.map(st => renderGrupoEdicao(st, meses, metasEmp)).join("")}
+      </div>
+    `;
+    return;
+  }
+
+  // modo leitura: só etapas/sub-etapas que já têm algum valor salvo
+  const grupos = STAGES.map(st=>{
+    const folhas = subEtapasFlat(st).filter(f => metasEmp[f.codigo] && Object.keys(metasEmp[f.codigo]).length>0);
+    return { st, folhas };
+  }).filter(g => g.folhas.length>0);
+
+  wrap.innerHTML = `
+    <div class="dashsection">
+      <div class="metastabhead">
+        <div class="dashsectiontitle" style="margin:0;">Metas por Sub-etapa</div>
+        <button class="metaseditbtn" id="metasEditBtn">✎</button>
+      </div>
+      ${grupos.length===0
+        ? `<div class="macroempty">Nenhuma meta cadastrada ainda. Toca no lápis pra adicionar.</div>`
+        : grupos.map(g => `
+            <div class="metasreadgroup">
+              <div class="metasreadtitle">${g.st.nome}</div>
+              <div class="metasreadhead">
+                <span></span>${meses.map(m=>`<span>${m.label}</span>`).join("")}
+              </div>
+              ${g.folhas.map(f => `
+                <div class="metasreadrow">
+                  <span>${f.nome}</span>
+                  ${meses.map(m => `<span>${metasEmp[f.codigo][m.chave] != null ? metasEmp[f.codigo][m.chave] : "—"}</span>`).join("")}
+                </div>
+              `).join("")}
+            </div>
+          `).join("")
+      }
+    </div>
+  `;
+}
+
+function salvarMetasSub(){
+  const inputs = document.querySelectorAll(".metaseditgridrow input");
+  const itens = [];
+  inputs.forEach(inp=>{
+    const v = inp.value.trim();
+    if(v !== "") itens.push({ codigo: inp.dataset.codigo, mes: inp.dataset.mes, valor: Number(v) });
+  });
+  toast("Salvando...", false, true);
+  api({ action:"saveMetasSub", emp: currentEmp, itens: JSON.stringify(itens) })
+    .then(res=>{
+      if(!res.success){ toast("Erro ao salvar", true); return; }
+      METASSUB_LOADED = false;
+      return loadMetasSub();
+    })
+    .then(()=>{
+      toast("Salvo");
+      metasSubEditMode = false;
+      renderMetasTab();
+    })
+    .catch(()=> toast("Sem conexão — tente de novo", true));
+}
+
 function renderDash(){
   const wrap = document.getElementById("dashWrap");
   const info = EMPREENDIMENTOS[currentEmp];
@@ -1435,6 +1618,10 @@ document.getElementById("popupWrap").addEventListener("click", (e)=>{
 document.getElementById("dashWrap").addEventListener("click", (e)=>{
   const btnMedido = e.target.closest("#medidoEditBtn");
   if(btnMedido){ abrirMedidoModal(); return; }
+  const btnMetasEdit = e.target.closest("#metasEditBtn");
+  if(btnMetasEdit){ metasSubEditMode = true; renderMetasTab(); return; }
+  const btnMetasOk = e.target.closest("#metasOkBtn");
+  if(btnMetasOk){ salvarMetasSub(); return; }
   const row = e.target.closest(".macrorow");
   if(!row) return;
   const group = row.closest(".macrogroup");
