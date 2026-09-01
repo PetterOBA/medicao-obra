@@ -212,6 +212,8 @@
   .metaseditgridhead span:first-child,.metasreadhead span:first-child{visibility:hidden;}
   .metaseditgridrow{padding:4px 0;}
   .metaseditgridrow span{font-size:11px;color:var(--txt2);}
+  .metaseditgridrow>span{display:flex;flex-direction:column;gap:1px;}
+  .metajafeito{font-size:9.5px;color:var(--txt3);font-weight:600;}
   .metaseditgridrow input{
     width:100%;font-size:11px;text-align:center;border:1px solid var(--line);border-radius:5px;
     padding:4px 2px;font-family:inherit;color:var(--txt);
@@ -1330,6 +1332,7 @@ document.getElementById("stageList").addEventListener("click", async (e)=>{
 /* ======================= METAS POR SUB-ETAPA — TAB ======================= */
 function renderGrupoEdicao(st, meses, metasEmp){
   const folhas = subEtapasFlat(st);
+  const total = EMPREENDIMENTOS[currentEmp].total;
   return `
     <div class="macrogroup">
       <div class="macrorow" data-macro="${st.codigo}">
@@ -1341,9 +1344,11 @@ function renderGrupoEdicao(st, meses, metasEmp){
         </div>
         ${folhas.map(f=>{
           const valores = metasEmp[f.codigo] || {};
+          let jaFeito = 0;
+          for(let i=1;i<=total;i++){ if(getStatus(currentEmp, String(i), f.codigo)==="concluido") jaFeito++; }
           return `
           <div class="metaseditgridrow">
-            <span>${f.nome}</span>
+            <span>${f.nome}<span class="metajafeito">${jaFeito}/${total} já feitas</span></span>
             ${meses.map(m => `<input type="number" min="0" inputmode="numeric" data-codigo="${f.codigo}" data-mes="${m.chave}" value="${valores[m.chave] ?? ''}" placeholder="—">`).join("")}
           </div>`;
         }).join("")}
