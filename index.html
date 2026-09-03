@@ -1280,8 +1280,17 @@ function openLoteEtapa(emp){
   loteSelecionados = [];
   document.getElementById("headTitle").textContent = "Marcação em Lote";
   document.getElementById("headSub").textContent = EMPREENDIMENTOS[emp].nome + " — escolha uma ou mais sub-etapas";
-  renderLoteEtapa();
   showScreen("screen-lote-etapa");
+  // precisa dos dados reais carregados ANTES de mostrar a lista — sem isso o
+  // app não sabe quais casas já têm cada sub-etapa concluída, e tratava tudo
+  // como "não iniciado" mesmo quando não era (afetava tanto o visual quanto
+  // o "Selecionar todas", que reenviava até quem já tava certo)
+  if(LOADED[emp]){
+    renderLoteEtapa();
+  } else {
+    document.getElementById("loteEtapaWrap").innerHTML = '<div class="loading">Carregando dados...</div>';
+    loadEmp(emp).then(renderLoteEtapa);
+  }
 }
 function loteEstaSelecionado(codigo){
   return loteSelecionados.some(s => s.codigo === codigo);
@@ -1405,7 +1414,13 @@ function salvarLote(){
   const itens = [];
   Object.keys(loteAlteracoes).forEach(u=>{
     loteSelecionados.forEach(s=>{
-      itens.push({ codigo: s.codigo, nome: s.nome, unidade: u, status: loteAlteracoes[u] });
+      // só manda pro servidor se o status realmente mudou de verdade —
+      // senão "Selecionar todas" reenviaria até quem já tava concluído sem
+      // mudar nada visível, e isso reescreveria a Data de Conclusão pra hoje
+      // (perdendo a data real de quando aquilo foi feito de verdade)
+      if(getStatus(currentEmp, u, s.codigo) !== loteAlteracoes[u]){
+        itens.push({ codigo: s.codigo, nome: s.nome, unidade: u, status: loteAlteracoes[u] });
+      }
     });
   });
   if(itens.length === 0){ toast("Nada foi alterado", true); return; }
