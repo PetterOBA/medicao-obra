@@ -1762,10 +1762,34 @@ function dataInicioEtapa(emp, codigos){
   }
   return menor;
 }
-function corCelulaGantt(valor, max){
-  if(!valor || valor<=0) return "#eef0f4";
+// data em que a ÚLTIMA casa fechou TODAS as sub-etapas dessa macro (ou seja, a
+// etapa ficou 100% concluída no empreendimento inteiro). Devolve null enquanto
+// qualquer casa ainda tiver algo pendente — é esse null que mantém a barra
+// "aberta" (indo até hoje), porque o serviço continua ativo até fechar de vez.
+function dataFimEtapa(emp, codigos){
+  const info = EMPREENDIMENTOS[emp];
+  let maior = null;
+  for(let i=1;i<=info.total;i++){
+    const u = String(i);
+    let maiorDestaCasa = null;
+    for(const cod of codigos){
+      if(getStatus(emp,u,cod) !== "concluido") return null;
+      const dc = getDataConclusao(emp,u,cod);
+      if(dc && (maiorDestaCasa===null || dc>maiorDestaCasa)) maiorDestaCasa = dc;
+    }
+    if(maiorDestaCasa && (maior===null || maiorDestaCasa>maior)) maior = maiorDestaCasa;
+  }
+  return maior;
+}
+// dentroBarra = a semana cai entre o início real e o fim (ou hoje, se ainda
+// não fechou) — fora disso a célula fica sempre vazia, sem exceção
+function corCelulaGantt(valor, max, dentroBarra){
+  if(!dentroBarra) return "#eef0f4";
   const intensidade = Math.min(1, valor/max);
-  return `rgba(12,31,160,${(0.18+0.82*intensidade).toFixed(2)})`;
+  // garante um preenchimento mínimo em toda semana dentro da barra, mesmo se
+  // não teve conclusão nova naquela semana específica — é isso que faz a
+  // barra ficar contínua (sem buraco) em vez de só acender onde teve marcação
+  return `rgba(12,31,160,${(0.32+0.68*intensidade).toFixed(2)})`;
 }
 
 function renderGanttTab(){
@@ -1779,14 +1803,31 @@ function renderGanttTab(){
   }
   const semanas = semanasEntre(ganttInicio, ganttFim);
   const colTemplate = `130px repeat(${semanas.length}, 30px)`;
+  const hojeStr = formatoYMD(new Date());
+
+  // uma semana está "dentro da barra" se cair entre a semana do início e a
+  // semana do fim (ou hoje, se ainda não fechou 100%) — comparação de string
+  // funciona certo porque as datas estão sempre em "YYYY-MM-DD"
+  function dentroDaBarra(semana, inicio, fim){
+    if(!inicio) return false;
+    const semanaInicio = formatoYMD(segundaFeira(new Date(inicio+"T00:00:00")));
+    const semanaFim = formatoYMD(segundaFeira(new Date((fim || hojeStr)+"T00:00:00")));
+    return semana >= semanaInicio && semana <= semanaFim;
+  }
 
   let maxValor = 0.0001;
   const linhas = STAGES.map(st=>{
     const codigos = subEtapasFlat(st).map(f=>f.codigo);
     const semanal = atividadeSemanal(currentEmp, codigos, semanas);
     Object.values(semanal).forEach(v=>{ if(v>maxValor) maxValor = v; });
-    return { st, codigos, semanal, inicio: dataInicioEtapa(currentEmp, codigos) };
+    return { st, codigos, semanal, inicio: dataInicioEtapa(currentEmp, codigos), fim: dataFimEtapa(currentEmp, codigos) };
   });
+
+  function statusLabel(inicio, fim){
+    if(!inicio) return "Não iniciado";
+    if(fim) return "Concluído " + diaMesCurto(fim);
+    return "Iniciado " + diaMesCurto(inicio);
+  }
 
   wrap.innerHTML = `
     <div class="dashsection">
@@ -1807,18 +1848,20 @@ function renderGanttTab(){
                 <span class="chevicon">▸</span>
                 <div>
                   <div class="ganttname">${l.st.nome}</div>
-                  <div class="ganttinicio">${l.inicio ? "Iniciado "+diaMesCurto(l.inicio) : "Não iniciado"}</div>
+                  <div class="ganttinicio">${statusLabel(l.inicio, l.fim)}</div>
                 </div>
               </div>
-              ${semanas.map(s=>`<div class="ganttcell" style="background:${corCelulaGantt(l.semanal[s], maxValor)}" title="${l.semanal[s].toFixed(2)}%"></div>`).join("")}
+              ${semanas.map(s=>`<div class="ganttcell" style="background:${corCelulaGantt(l.semanal[s], maxValor, dentroDaBarra(s, l.inicio, l.fim))}" title="${l.semanal[s].toFixed(2)}%"></div>`).join("")}
             </div>
             <div class="ganttsubwrap">
               ${subEtapasFlat(l.st).map(f=>{
                 const semanalSub = atividadeSemanal(currentEmp, [f.codigo], semanas);
+                const inicioSub = dataInicioEtapa(currentEmp, [f.codigo]);
+                const fimSub = dataFimEtapa(currentEmp, [f.codigo]);
                 return `
                   <div class="ganttrow" style="grid-template-columns:${colTemplate};">
                     <div class="ganttrowlabel ganttsub"><span></span><div class="ganttname">${f.nome}</div></div>
-                    ${semanas.map(s=>`<div class="ganttcell ganttcellsub" style="background:${corCelulaGantt(semanalSub[s], maxValor)}" title="${semanalSub[s].toFixed(2)}%"></div>`).join("")}
+                    ${semanas.map(s=>`<div class="ganttcell ganttcellsub" style="background:${corCelulaGantt(semanalSub[s], maxValor, dentroDaBarra(s, inicioSub, fimSub))}" title="${semanalSub[s].toFixed(2)}%"></div>`).join("")}
                   </div>
                 `;
               }).join("")}
