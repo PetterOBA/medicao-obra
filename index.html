@@ -223,6 +223,11 @@
   .metasreadrow{padding:5px 0;border-top:1px solid var(--grayBg);}
   .metasreadrow span{font-size:11px;color:var(--txt);}
   .metasreadrow span:not(:first-child){text-align:center;font-weight:700;color:var(--txt2);}
+  .loteleafrow{
+    padding:9px 4px;font-size:12.5px;color:var(--txt);border-top:1px dashed var(--line);cursor:pointer;
+  }
+  .loteleafrow:active{background:var(--grayBg);}
+  .loteleafrow:first-child{border-top:none;}
   .subetapaname span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .subetapaname span:last-child{font-weight:700;color:var(--txt);flex-shrink:0;}
   .subetapabar{height:4px;background:var(--grayBg);border-radius:3px;overflow:hidden;}
@@ -410,6 +415,16 @@
     <div class="dashwrap" id="dashWrap">
       <div class="loading">Carregando dados...</div>
     </div>
+  </div>
+
+  <!-- MARCAÇÃO EM LOTE — escolher sub-etapa -->
+  <div class="screen" id="screen-lote-etapa">
+    <div class="dashwrap" id="loteEtapaWrap"></div>
+  </div>
+
+  <!-- MARCAÇÃO EM LOTE — marcar várias casas de uma vez -->
+  <div class="screen" id="screen-lote-casas">
+    <div class="dashwrap" id="loteCasasWrap"></div>
   </div>
 
 </div>
@@ -1031,7 +1046,12 @@ document.getElementById("btnBack").addEventListener("click", ()=>{
     openGrid(currentEmp);
   } else if(document.getElementById("screen-grid").classList.contains("active")){
     openHome();
+  } else if(document.getElementById("screen-lote-casas").classList.contains("active")){
+    openLoteEtapa(currentEmp);
+  } else if(document.getElementById("screen-lote-etapa").classList.contains("active")){
+    openHome();
   } else if(document.getElementById("screen-home").classList.contains("active")){
+    modoLote = false;
     openMenu();
   } else if(document.getElementById("screen-dash").classList.contains("active")){
     openMenu();
@@ -1049,10 +1069,14 @@ function openMenu(){
 function openHome(){
   currentEmp = null; currentUnit = null;
   document.getElementById("btnBack").style.display = "flex";
-  document.getElementById("headTitle").textContent = "Medição de Obra";
+  document.getElementById("headTitle").textContent = modoLote ? "Marcação em Lote" : "Medição de Obra";
   document.getElementById("headSub").textContent = "Selecione o empreendimento";
   renderHome();
   showScreen("screen-home");
+}
+function openLoteHome(){
+  modoLote = true;
+  openHome();
 }
 function openGrid(emp){
   currentEmp = emp; currentUnit = null;
@@ -1159,6 +1183,9 @@ function proximosTresMeses(){
 
 let dashTab = "geral";
 let metasSubEditMode = false;
+let modoLote = false;
+let loteCodigo = null, loteNome = null;
+let loteAlteracoes = {}; // { unidade: novoStatus } — mudanças ainda não salvas
 
 function openDash(emp){
   currentEmp = emp; currentUnit = null;
@@ -1192,7 +1219,8 @@ function renderMenu(){
   const wrap = document.getElementById("menuCards");
   wrap.innerHTML = "";
   const opcoes = [
-    { nome: "Medição", meta: "Lançar andamento das unidades em campo", acao: openHome },
+    { nome: "Medição", meta: "Lançar andamento das unidades em campo", acao: ()=>{ modoLote=false; openHome(); } },
+    { nome: "Marcação em Lote", meta: "Marcar a mesma sub-etapa em várias casas de uma vez", acao: openLoteHome },
     { nome: "Dashboard Supremo Goiânia", meta: "Acompanhamento geral da obra", acao: ()=>openDash("GOIANIA") },
     { nome: "Dashboard Supremo Goiás", meta: "Acompanhamento geral da obra", acao: ()=>openDash("GOIAS") }
   ];
@@ -1223,9 +1251,102 @@ function renderHome(){
         <div class="projprog"><div class="bar"><i style="width:${pct||0}%"></i></div><div class="pct">${pct===null?"–":pct+"%"}</div></div>
       </div>
       <div class="parrow">›</div>`;
-    card.addEventListener("click", ()=> openGrid(info.id));
+    card.addEventListener("click", ()=> modoLote ? openLoteEtapa(info.id) : openGrid(info.id));
     wrap.appendChild(card);
   });
+}
+
+/* ======================= MARCAÇÃO EM LOTE ======================= */
+function openLoteEtapa(emp){
+  currentEmp = emp;
+  document.getElementById("headTitle").textContent = "Marcação em Lote";
+  document.getElementById("headSub").textContent = EMPREENDIMENTOS[emp].nome + " — escolha a sub-etapa";
+  renderLoteEtapa();
+  showScreen("screen-lote-etapa");
+}
+function renderLoteEtapa(){
+  const wrap = document.getElementById("loteEtapaWrap");
+  wrap.innerHTML = `
+    <div class="dashsection">
+      ${STAGES.map(st => `
+        <div class="macrogroup">
+          <div class="macrorow" data-macro="${st.codigo}">
+            <div class="mname"><div class="mleft"><span class="chevicon">▸</span><span>${st.nome}</span></div></div>
+          </div>
+          <div class="macrosubs">
+            ${subEtapasFlat(st).map(f => `
+              <div class="loteleafrow" data-codigo="${f.codigo}" data-nome="${f.nome.split(" – ").pop()}">${f.nome}</div>
+            `).join("")}
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+document.getElementById("loteEtapaWrap").addEventListener("click", (e)=>{
+  const leafRow = e.target.closest(".loteleafrow");
+  if(leafRow){
+    loteCodigo = leafRow.dataset.codigo;
+    loteNome = leafRow.dataset.nome;
+    openLoteCasas();
+    return;
+  }
+  const row = e.target.closest(".macrorow");
+  if(!row) return;
+  const group = row.closest(".macrogroup");
+  if(group) group.classList.toggle("open");
+});
+
+function openLoteCasas(){
+  loteAlteracoes = {};
+  document.getElementById("headTitle").textContent = loteNome;
+  document.getElementById("headSub").textContent = EMPREENDIMENTOS[currentEmp].nome + " — toque pra marcar/desmarcar concluído";
+  renderLoteCasas();
+  showScreen("screen-lote-casas");
+}
+function renderLoteCasas(){
+  const wrap = document.getElementById("loteCasasWrap");
+  const info = EMPREENDIMENTOS[currentEmp];
+  let tiles = "";
+  for(let i=1;i<=info.total;i++){
+    const u = String(i);
+    const atual = loteAlteracoes[u] !== undefined ? loteAlteracoes[u] : getStatus(currentEmp, u, loteCodigo);
+    tiles += `<div class="unit ${atual==='concluido'?'concluido':''}" data-unidade="${u}">${u}</div>`;
+  }
+  wrap.innerHTML = `
+    <div class="dashsection">
+      <div class="metastabhead">
+        <div class="dashsectiontitle" style="margin:0;">${loteNome}</div>
+        <button class="metasokbtn" id="loteSalvarBtn">Salvar</button>
+      </div>
+      <div class="unitgrid" id="loteGrid">${tiles}</div>
+    </div>
+  `;
+}
+document.getElementById("loteCasasWrap").addEventListener("click", (e)=>{
+  const btnSalvar = e.target.closest("#loteSalvarBtn");
+  if(btnSalvar){ salvarLote(); return; }
+  const tile = e.target.closest(".unit");
+  if(!tile) return;
+  const u = tile.dataset.unidade;
+  const atual = loteAlteracoes[u] !== undefined ? loteAlteracoes[u] : getStatus(currentEmp, u, loteCodigo);
+  const novo = atual === "concluido" ? "nao_iniciado" : "concluido";
+  loteAlteracoes[u] = novo;
+  tile.classList.toggle("concluido", novo === "concluido");
+});
+function salvarLote(){
+  const itens = Object.keys(loteAlteracoes).map(u => ({ unidade: u, status: loteAlteracoes[u] }));
+  if(itens.length === 0){ toast("Nada foi alterado", true); return; }
+  toast("Salvando...", false, true);
+  api({ action:"saveLote", emp: currentEmp, codigo: loteCodigo, nome: loteNome, itens: JSON.stringify(itens) })
+    .then(res=>{
+      if(!res.success){ toast("Erro ao salvar", true); return; }
+      itens.forEach(it => setStatusLocal(currentEmp, it.unidade, loteCodigo, it.status));
+      loteAlteracoes = {};
+      toast("Salvo");
+      renderLoteCasas();
+    })
+    .catch(()=> toast("Sem conexão — tente de novo", true));
 }
 
 function renderGrid(){
