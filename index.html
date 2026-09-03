@@ -897,11 +897,19 @@ function hideToast(){ document.getElementById("toast").classList.remove("show");
 
 /* ======================= API ======================= */
 function api(params){
-  // adiciona um valor único na URL + cache:"no-store" pra garantir que o navegador
-  // nunca devolva uma resposta antiga em cache (principalmente no "load" — sem isso,
-  // dados novos salvos no BD podem não aparecer até o cache expirar sozinho)
-  const qs = new URLSearchParams({ ...params, _ts: Date.now() }).toString();
-  return fetch(URL_SCRIPT + "?" + qs, { cache: "no-store" }).then(r=>r.json());
+  // POST em vez de GET: os dados vão no corpo da requisição, não na URL — sem
+  // isso, uma marcação em lote com muita casa de uma vez gera uma URL gigante
+  // que estoura o limite que servidores aceitam e a requisição nem sai do
+  // celular (aparecia como "sem conexão", mas o problema era tamanho, não rede).
+  // "_ts" continua indo junto só por costume; POST já não é cacheado pelo
+  // navegador, mas não custa manter.
+  const body = new URLSearchParams({ ...params, _ts: Date.now() }).toString();
+  return fetch(URL_SCRIPT, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body,
+    cache: "no-store"
+  }).then(r=>r.json());
 }
 // ── Fila de reenvio (outbox) ──
 // Cada marcação pendente fica registrada aqui ANTES de tentar enviar pro servidor.
