@@ -223,6 +223,28 @@
   .metasreadrow{padding:5px 0;border-top:1px solid var(--grayBg);}
   .metasreadrow span{font-size:11px;color:var(--txt);}
   .metasreadrow span:not(:first-child){text-align:center;font-weight:700;color:var(--txt2);}
+  .ganttperiodo{display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;}
+  .ganttperiodo label{font-size:9.5px;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:3px;}
+  .ganttperiodo input{border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-size:12px;font-family:inherit;}
+  .ganttscroll{overflow-x:auto;padding-bottom:6px;}
+  .ganttmacroblock{margin-bottom:2px;}
+  .ganttrow{display:grid;align-items:center;gap:3px;margin-bottom:3px;}
+  .ganttrowlabel{
+    display:flex;align-items:center;gap:6px;cursor:pointer;padding-right:6px;
+    position:sticky;left:0;background:#f2f3f6;z-index:1;
+  }
+  .ganttname{font-size:10.5px;font-weight:700;color:var(--txt);line-height:1.25;}
+  .ganttinicio{font-size:8.5px;color:var(--txt3);font-weight:600;}
+  .ganttrowlabel.ganttsub .ganttname{font-size:9.5px;font-weight:500;color:var(--txt2);}
+  .ganttrowlabel.ganttsub{padding-left:14px;}
+  .ganttcell{height:22px;border-radius:4px;}
+  .ganttcellsub{height:16px;border-radius:3px;}
+  .ganttweekhead{font-size:8px;color:var(--txt3);font-weight:700;text-align:center;}
+  .ganttsubwrap{display:none;padding-left:4px;border-left:2px solid var(--grayBg);margin-left:2px;}
+  .ganttmacroblock.open .ganttsubwrap{display:block;}
+  .ganttmacroblock.open .ganttrowlabel .chevicon{transform:rotate(90deg);}
+  .ganttlegenda{display:flex;align-items:center;gap:5px;margin-top:10px;font-size:9.5px;color:var(--txt2);}
+  .ganttlegenda i{width:14px;height:10px;border-radius:2px;display:inline-block;}
   .loteleafrow{
     padding:9px 4px;font-size:12.5px;color:var(--txt);border-top:1px dashed var(--line);cursor:pointer;
     display:flex;align-items:center;gap:9px;
@@ -422,6 +444,7 @@
     <div class="dashtabs" id="dashTabs">
       <button class="dashtabbtn active" data-tab="geral">Visão Geral</button>
       <button class="dashtabbtn" data-tab="metas">Metas</button>
+      <button class="dashtabbtn" data-tab="atividade">Atividade</button>
     </div>
     <div class="dashwrap" id="dashWrap">
       <div class="loading">Carregando dados...</div>
@@ -1221,6 +1244,7 @@ function openDash(emp){
 // escolhe qual dos dois conteúdos desenhar, sem recarregar dado nenhum de novo
 function renderDashAtual(){
   if(dashTab === "metas") renderMetasTab();
+  else if(dashTab === "atividade") renderGanttTab();
   else renderDash();
 }
 document.getElementById("dashTabs").addEventListener("click", (e)=>{
@@ -1667,6 +1691,163 @@ function salvarMetasSub(){
     })
     .catch(()=> toast("Sem conexão — tente de novo", true));
 }
+
+/* ======================= ATIVIDADE (GANTT SEMANAL) ======================= */
+let ganttInicio = null, ganttFim = null; // "YYYY-MM-DD" — período visível, escolhido pela pessoa
+// casa decorada: já vem pronta fora da ordem normal da obra, então não conta
+// pra decidir quando uma etapa "começou" (senão distorceria pra trás todo mundo).
+// Continua aparecendo normal nas células de atividade — só fica de fora dessa conta específica.
+const CASAS_EXCLUIR_DATA_INICIO = { GOIANIA: ["70"], GOIAS: [] };
+
+function segundaFeira(data){
+  const d = new Date(data);
+  const dia = d.getDay();
+  const diff = (dia===0 ? -6 : 1) - dia;
+  d.setDate(d.getDate()+diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+function formatoYMD(d){
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function diaMesCurto(dataStr){
+  const [,m,d] = dataStr.split("-");
+  return d+"/"+m;
+}
+function semanasEntre(inicioStr, fimStr){
+  const semanas = [];
+  let cursor = segundaFeira(new Date(inicioStr+"T00:00:00"));
+  const fim = new Date(fimStr+"T00:00:00");
+  let guarda = 0;
+  while(cursor <= fim && guarda < 104){ // trava de segurança: no máx. 2 anos de semanas de uma vez
+    semanas.push(formatoYMD(cursor));
+    cursor.setDate(cursor.getDate()+7);
+    guarda++;
+  }
+  return semanas;
+}
+// soma o peso concluído por semana, pra uma lista de códigos, no empreendimento inteiro
+function atividadeSemanal(emp, codigos, semanas){
+  const info = EMPREENDIMENTOS[emp];
+  const porSemana = {}; semanas.forEach(s => porSemana[s] = 0);
+  for(let i=1;i<=info.total;i++){
+    const u = String(i);
+    codigos.forEach(cod=>{
+      if(getStatus(emp,u,cod)==="concluido"){
+        const dc = getDataConclusao(emp,u,cod);
+        if(dc){
+          const seg = formatoYMD(segundaFeira(new Date(dc+"T00:00:00")));
+          if(porSemana[seg] !== undefined) porSemana[seg] += (PESOS[cod]||0);
+        }
+      }
+    });
+  }
+  Object.keys(porSemana).forEach(k => porSemana[k] = info.total ? (porSemana[k]/info.total)*100 : 0);
+  return porSemana;
+}
+// primeira data de conclusão entre os códigos dados, ignorando a(s) casa(s) decorada(s)
+function dataInicioEtapa(emp, codigos){
+  const info = EMPREENDIMENTOS[emp];
+  const excluir = new Set(CASAS_EXCLUIR_DATA_INICIO[emp] || []);
+  let menor = null;
+  for(let i=1;i<=info.total;i++){
+    const u = String(i);
+    if(excluir.has(u)) continue;
+    codigos.forEach(cod=>{
+      if(getStatus(emp,u,cod)==="concluido"){
+        const dc = getDataConclusao(emp,u,cod);
+        if(dc && (menor===null || dc < menor)) menor = dc;
+      }
+    });
+  }
+  return menor;
+}
+function corCelulaGantt(valor, max){
+  if(!valor || valor<=0) return "#eef0f4";
+  const intensidade = Math.min(1, valor/max);
+  return `rgba(12,31,160,${(0.18+0.82*intensidade).toFixed(2)})`;
+}
+
+function renderGanttTab(){
+  const wrap = document.getElementById("dashWrap");
+  if(!ganttFim){
+    const hoje = new Date();
+    ganttFim = formatoYMD(hoje);
+    const oitoSemanasAtras = new Date(hoje);
+    oitoSemanasAtras.setDate(oitoSemanasAtras.getDate() - 7*8);
+    ganttInicio = formatoYMD(oitoSemanasAtras);
+  }
+  const semanas = semanasEntre(ganttInicio, ganttFim);
+  const colTemplate = `130px repeat(${semanas.length}, 30px)`;
+
+  let maxValor = 0.0001;
+  const linhas = STAGES.map(st=>{
+    const codigos = subEtapasFlat(st).map(f=>f.codigo);
+    const semanal = atividadeSemanal(currentEmp, codigos, semanas);
+    Object.values(semanal).forEach(v=>{ if(v>maxValor) maxValor = v; });
+    return { st, codigos, semanal, inicio: dataInicioEtapa(currentEmp, codigos) };
+  });
+
+  wrap.innerHTML = `
+    <div class="dashsection">
+      <div class="ganttperiodo">
+        <div><label>De</label><input type="date" id="ganttDataIni" value="${ganttInicio}"></div>
+        <div><label>Até</label><input type="date" id="ganttDataFim" value="${ganttFim}"></div>
+        <button class="metasokbtn" id="ganttAplicarBtn">Aplicar</button>
+      </div>
+      <div class="ganttscroll">
+        <div class="ganttrow" style="grid-template-columns:${colTemplate};">
+          <div></div>
+          ${semanas.map(s=>`<div class="ganttweekhead">${diaMesCurto(s)}</div>`).join("")}
+        </div>
+        ${linhas.map(l => `
+          <div class="ganttmacroblock" data-macro="${l.st.codigo}">
+            <div class="ganttrow" style="grid-template-columns:${colTemplate};">
+              <div class="ganttrowlabel">
+                <span class="chevicon">▸</span>
+                <div>
+                  <div class="ganttname">${l.st.nome}</div>
+                  <div class="ganttinicio">${l.inicio ? "Iniciado "+diaMesCurto(l.inicio) : "Não iniciado"}</div>
+                </div>
+              </div>
+              ${semanas.map(s=>`<div class="ganttcell" style="background:${corCelulaGantt(l.semanal[s], maxValor)}" title="${l.semanal[s].toFixed(2)}%"></div>`).join("")}
+            </div>
+            <div class="ganttsubwrap">
+              ${subEtapasFlat(l.st).map(f=>{
+                const semanalSub = atividadeSemanal(currentEmp, [f.codigo], semanas);
+                return `
+                  <div class="ganttrow" style="grid-template-columns:${colTemplate};">
+                    <div class="ganttrowlabel ganttsub"><span></span><div class="ganttname">${f.nome}</div></div>
+                    ${semanas.map(s=>`<div class="ganttcell ganttcellsub" style="background:${corCelulaGantt(semanalSub[s], maxValor)}" title="${semanalSub[s].toFixed(2)}%"></div>`).join("")}
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      <div class="ganttlegenda">
+        <span>Sem atividade</span><i style="background:#eef0f4"></i><i style="background:rgba(12,31,160,.5)"></i><i style="background:#0c1fa0"></i><span>Muita atividade</span>
+      </div>
+    </div>
+  `;
+}
+document.getElementById("dashWrap").addEventListener("click", (e)=>{
+  const btnAplicar = e.target.closest("#ganttAplicarBtn");
+  if(btnAplicar){
+    const ini = document.getElementById("ganttDataIni").value;
+    const fim = document.getElementById("ganttDataFim").value;
+    if(ini && fim && ini <= fim){ ganttInicio = ini; ganttFim = fim; renderGanttTab(); }
+    else toast("Período inválido", true);
+    return;
+  }
+  const rowLabel = e.target.closest(".ganttrowlabel:not(.ganttsub)");
+  if(rowLabel){
+    const block = rowLabel.closest(".ganttmacroblock");
+    if(block) block.classList.toggle("open");
+    return;
+  }
+});
 
 function renderDash(){
   const wrap = document.getElementById("dashWrap");
