@@ -757,13 +757,12 @@ function unitOverallStatus(emp, unidade){
   if(pct>0) return "andamento";
   return "nao_iniciado";
 }
+// mesma conta ponderada do Campo (dashboard) — antes esse card usava uma
+// média simples (cada sub-etapa valendo igual), o que dava um número
+// diferente do Campo. Unificado pra mostrar sempre o mesmo número em
+// qualquer lugar do app que fale de "progresso geral".
 function empProgress(emp){
-  const total = EMPREENDIMENTOS[emp].total * ALL_LEAVES.length;
-  let done = 0;
-  for(let i=1;i<=EMPREENDIMENTOS[emp].total;i++){
-    done += ALL_LEAVES.filter(c => getStatus(emp, String(i), c)==="concluido").length;
-  }
-  return total ? Math.round((done/total)*100) : 0;
+  return Math.round(campoPercentPonderado(emp));
 }
 
 /* ======================= DASHBOARD: helpers ======================= */
