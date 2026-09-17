@@ -1716,17 +1716,19 @@ function gerarRelatorioSemanal(){
   const metasEmp = METASSUB_HIST[currentEmp] || {};
   const nSemanas = semanasNoMes(mesAtual);
 
-  // soma todas as sub-etapas de cada macro-etapa pra esse mês, e já divide
-  // pela quantidade de semanas — arredondando pra cima, pra nunca passar
-  // meta pequena de menos pro mestre de obra
+  // o valor da macro-etapa é o GARGALO — o menor valor entre as sub-etapas que
+  // têm meta pro mês, não a soma delas (são tarefas em sequência dentro da
+  // mesma etapa, então quem anda mais devagar é quem trava o ritmo de todas)
   const linhas = STAGES.map(st=>{
     const folhas = subEtapasFlat(st);
-    let totalMes = 0;
+    const valores = [];
     folhas.forEach(f=>{
       const v = (metasEmp[f.codigo] || {})[mesAtual];
-      if(v) totalMes += Number(v);
+      if(v) valores.push(Number(v));
     });
-    return { nome: st.nome, porSemana: Math.ceil(totalMes / nSemanas) };
+    if(valores.length === 0) return { nome: st.nome, porSemana: 0 };
+    const menorValor = Math.min(...valores);
+    return { nome: st.nome, porSemana: Math.ceil(menorValor / nSemanas) };
   }).filter(l => l.porSemana > 0);
 
   const container = document.getElementById("relatorioSemanalWrap");
