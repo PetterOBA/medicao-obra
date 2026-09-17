@@ -371,7 +371,28 @@
   .confirmbtn{flex:1;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;}
   .confirmbtn.cancel{background:var(--grayBg);color:var(--txt2);}
   .confirmbtn.ok{background:var(--green);color:#fff;}
+  .metasreportbtn{background:#fff;border:1px solid var(--line);color:var(--navy2);border-radius:8px;width:32px;height:32px;font-size:14px;cursor:pointer;flex-shrink:0;margin-right:6px;}
 
+  /* ===== Relatório semanal de metas — só existe pra impressão ===== */
+  #relatorioSemanalWrap{display:none;}
+  .relhead{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0a1338;padding-bottom:12px;margin-bottom:18px;}
+  .relhead .relmarca{font-size:20px;font-weight:800;color:#0a1338;letter-spacing:.02em;}
+  .relhead .relmarcasub{font-size:11px;color:#c9a227;font-weight:700;letter-spacing:.08em;}
+  .relhead .reltitulo{font-size:15px;font-weight:700;color:#171b2e;text-align:right;}
+  .relhead .relsub{font-size:12px;color:#5c6377;text-align:right;margin-top:2px;}
+  .reltable{width:100%;border-collapse:collapse;margin-top:6px;}
+  .reltable th{
+    text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#5c6377;
+    border-bottom:2px solid #171b2e;padding:8px 6px;
+  }
+  .reltable th.reln{text-align:right;}
+  .reltable td{padding:11px 6px;font-size:14px;color:#171b2e;border-bottom:1px solid #e4e6ee;}
+  .reltable td.reln{text-align:right;font-weight:800;font-size:16px;}
+  .relfoot{margin-top:26px;font-size:10.5px;color:#9298a8;}
+  @media print{
+    body > *:not(#relatorioSemanalWrap){display:none !important;}
+    #relatorioSemanalWrap{display:block !important;padding:20px;}
+  }
 </style>
 </head>
 <body>
@@ -484,6 +505,11 @@
     </div>
   </div>
 </div>
+
+<!-- RELATÓRIO SEMANAL DE METAS — só aparece na hora de imprimir (@media print
+     esconde o resto do app e mostra só isso). Fica fora de qualquer .screen
+     de propósito, pra não interferir na navegação normal do app. -->
+<div id="relatorioSemanalWrap"></div>
 
 <div class="confirmwrap" id="medidoWrap">
   <div class="confirmbox medidobox">
@@ -1648,7 +1674,10 @@ function renderMetasTab(){
     <div class="dashsection">
       <div class="metastabhead">
         <div class="dashsectiontitle" style="margin:0;">Metas por Sub-etapa</div>
-        <button class="metaseditbtn" id="metasEditBtn">✎</button>
+        <div style="display:flex;">
+          <button class="metasreportbtn" id="metasRelatorioBtn" title="Gerar relatório semanal">🖨</button>
+          <button class="metaseditbtn" id="metasEditBtn">✎</button>
+        </div>
       </div>
       ${grupos.length===0
         ? `<div class="macroempty">Nenhuma meta cadastrada ainda. Toca no lápis pra adicionar.</div>`
@@ -1669,6 +1698,61 @@ function renderMetasTab(){
       }
     </div>
   `;
+}
+
+// quantas semanas o mês em questão tem, pra dividir a meta mensal numa cota
+// semanal — usa dias-do-mês ÷ 7 arredondado pra cima (mês de 30/31 dias vira
+// 5 semanas, mês de 28 vira 4), sem precisar decidir limite exato de semana
+function semanasNoMes(mesRef){
+  const [ano, mes] = mesRef.split("-").map(Number);
+  const diasNoMes = new Date(ano, mes, 0).getDate();
+  return Math.ceil(diasNoMes / 7);
+}
+
+function gerarRelatorioSemanal(){
+  const info = EMPREENDIMENTOS[currentEmp];
+  const hoje = new Date();
+  const mesAtual = mesKey(hoje);
+  const metasEmp = METASSUB_HIST[currentEmp] || {};
+  const nSemanas = semanasNoMes(mesAtual);
+
+  // soma todas as sub-etapas de cada macro-etapa pra esse mês, e já divide
+  // pela quantidade de semanas — arredondando pra cima, pra nunca passar
+  // meta pequena de menos pro mestre de obra
+  const linhas = STAGES.map(st=>{
+    const folhas = subEtapasFlat(st);
+    let totalMes = 0;
+    folhas.forEach(f=>{
+      const v = (metasEmp[f.codigo] || {})[mesAtual];
+      if(v) totalMes += Number(v);
+    });
+    return { nome: st.nome, porSemana: Math.ceil(totalMes / nSemanas) };
+  }).filter(l => l.porSemana > 0);
+
+  const container = document.getElementById("relatorioSemanalWrap");
+  container.innerHTML = `
+    <div class="relhead">
+      <div>
+        <div class="relmarca">SUMMUS</div>
+        <div class="relmarcasub">ENGENHARIA</div>
+      </div>
+      <div>
+        <div class="reltitulo">Metas da Semana — ${info.nome}</div>
+        <div class="relsub">${mesLabel(hoje)} · meta mensal ÷ ${nSemanas} semanas do mês</div>
+      </div>
+    </div>
+    ${linhas.length === 0
+      ? `<p style="color:#5c6377;font-size:13px;">Nenhuma meta cadastrada para ${mesLabel(hoje)}.</p>`
+      : `<table class="reltable">
+          <thead><tr><th>Etapa</th><th class="reln">Meta da semana</th></tr></thead>
+          <tbody>
+            ${linhas.map(l => `<tr><td>${l.nome}</td><td class="reln">${l.porSemana} casas</td></tr>`).join("")}
+          </tbody>
+        </table>`
+    }
+    <div class="relfoot">Gerado em ${diaMesCurto(formatoYMD(hoje))}/${hoje.getFullYear()} · valores arredondados pra cima</div>
+  `;
+  window.print();
 }
 
 function salvarMetasSub(){
@@ -2087,6 +2171,8 @@ document.getElementById("dashWrap").addEventListener("click", (e)=>{
   if(btnMedido){ abrirMedidoModal(); return; }
   const btnMetasEdit = e.target.closest("#metasEditBtn");
   if(btnMetasEdit){ metasSubEditMode = true; renderMetasTab(); return; }
+  const btnMetasRelatorio = e.target.closest("#metasRelatorioBtn");
+  if(btnMetasRelatorio){ gerarRelatorioSemanal(); return; }
   const btnMetasOk = e.target.closest("#metasOkBtn");
   if(btnMetasOk){ salvarMetasSub(); return; }
   const row = e.target.closest(".macrorow");
