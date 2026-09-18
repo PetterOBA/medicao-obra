@@ -411,6 +411,8 @@
   }
   .reltable th.reln{text-align:right;}
   .reltable td{padding:11px 6px;font-size:14px;color:#171b2e;border-bottom:1px solid #e4e6ee;}
+  .reltable td.relmacro{font-weight:700;}
+  .reltable td.relsub{font-size:13px;color:#5c6377;padding-left:22px;}
   .reltable td.reln{text-align:right;font-weight:800;font-size:16px;}
   .relfoot{margin-top:26px;font-size:10.5px;color:#9298a8;}
   @media print{
@@ -1859,11 +1861,11 @@ function gerarRelatorioSemanalFinal(){
           <tbody>
             ${linhas.map(l=>{
               const cfg = relatorioConfig[l.codigo];
-              if(!cfg.detalhado) return `<tr><td>${l.nome}</td><td class="reln">${l.porSemana} casas</td></tr>`;
+              if(!cfg.detalhado) return `<tr><td class="relmacro">${l.nome}</td><td class="reln relmacro">${l.porSemana} casas</td></tr>`;
               const subsMarcadas = l.subs.filter(s => cfg.subsIncluidos[s.codigo]);
               if(subsMarcadas.length === 0) return "";
-              return `<tr><td colspan="2" style="font-weight:700;padding-top:14px;border-bottom:none;">${l.nome}</td></tr>` +
-                subsMarcadas.map(s=>`<tr><td style="padding-left:22px;color:#5c6377;">${s.nome}</td><td class="reln">${s.porSemana} casas</td></tr>`).join("");
+              return `<tr><td colspan="2" class="relmacro" style="padding-top:14px;border-bottom:none;">${l.nome}</td></tr>` +
+                subsMarcadas.map(s=>`<tr><td class="relsub">${s.nome}</td><td class="reln relsub">${s.porSemana} casas</td></tr>`).join("");
             }).join("")}
           </tbody>
         </table>`
