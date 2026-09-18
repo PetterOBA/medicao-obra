@@ -1702,8 +1702,10 @@ function renderMetasTab(){
   }
 
   // modo leitura: só etapas/sub-etapas que já têm algum valor salvo
+  // "0" conta como "sem meta" pra visualização — zerar um campo é como apagar
+  // ele, então some da leitura igual sumiria se nunca tivesse sido preenchido
   const grupos = STAGES.map(st=>{
-    const folhas = subEtapasFlat(st).filter(f => metasEmp[f.codigo] && Object.keys(metasEmp[f.codigo]).length>0);
+    const folhas = subEtapasFlat(st).filter(f => metasEmp[f.codigo] && Object.values(metasEmp[f.codigo]).some(v=>v>0));
     return { st, folhas };
   }).filter(g => g.folhas.length>0);
 
@@ -1876,11 +1878,21 @@ function gerarRelatorioSemanalFinal(){
 }
 
 function salvarMetasSub(){
+  const metasEmp = METASSUB_HIST[currentEmp] || {};
   const inputs = document.querySelectorAll(".metaseditgridrow input");
   const itens = [];
   inputs.forEach(inp=>{
     const v = inp.value.trim();
-    if(v !== "") itens.push({ codigo: inp.dataset.codigo, mes: inp.dataset.mes, valor: Number(v) });
+    const codigo = inp.dataset.codigo, mes = inp.dataset.mes;
+    const tinhaValorAntes = (metasEmp[codigo] || {})[mes] !== undefined;
+    if(v !== ""){
+      itens.push({ codigo, mes, valor: Number(v) });
+    } else if(tinhaValorAntes){
+      // campo tinha valor e foi apagado de propósito — manda 0 pra zerar de
+      // verdade na planilha. Sem isso, "esvaziar o campo" parece igual a
+      // "nunca preencher" e o valor antigo nunca é sobrescrito.
+      itens.push({ codigo, mes, valor: 0 });
+    }
   });
   toast("Salvando...", false, true);
   api({ action:"saveMetasSub", emp: currentEmp, itens: JSON.stringify(itens) })
