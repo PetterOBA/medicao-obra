@@ -425,8 +425,8 @@
   }
   .reltable th.reln{text-align:right;}
   .reltable td{padding:11px 6px;font-size:14px;color:#171b2e;border-bottom:1px solid #e4e6ee;}
-  .reltable td.relmacro{font-weight:700;}
-  .reltable td.relsub{font-size:13px;color:#5c6377;padding-left:22px;}
+  td.relmacro{font-weight:700;}
+  td.relsub{font-size:13px;color:#5c6377;padding-left:22px;}
   .reltable td.reln{text-align:right;font-weight:800;font-size:16px;}
   .relfoot{margin-top:26px;font-size:10.5px;color:#9298a8;}
   @media print{
@@ -2022,7 +2022,7 @@ function gerarRelatorioGeralFinal(){
   linhas.forEach(l=>{
     const cfg = relatorioConfig[l.codigo];
     if(!cfg.detalhado){
-      linhasHtml += `<tr><td class="relmacro">${l.nome}</td>${meses.map(m=>`<td>${l.porMes[m] ?? "—"}</td>`).join("")}</tr>`;
+      linhasHtml += `<tr><td class="relmacro">${l.nome}</td>${meses.map(m=>`<td class="relmacro">${l.porMes[m] ?? "—"}</td>`).join("")}</tr>`;
     } else {
       const subsMarcadas = l.subs.filter(s=>cfg.subsIncluidos[s.codigo]);
       if(subsMarcadas.length===0) return;
