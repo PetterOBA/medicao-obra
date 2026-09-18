@@ -372,6 +372,27 @@
   .confirmbtn.cancel{background:var(--grayBg);color:var(--txt2);}
   .confirmbtn.ok{background:var(--green);color:#fff;}
   .metasreportbtn{background:#fff;border:1px solid var(--line);color:var(--navy2);border-radius:8px;width:32px;height:32px;font-size:14px;cursor:pointer;flex-shrink:0;margin-right:6px;}
+  .relatorioconfirmbox{max-width:400px;max-height:80vh;display:flex;flex-direction:column;}
+  #relatorioConfirmLista{overflow-y:auto;margin:2px 0 14px;}
+  .relconfrow{border-bottom:1px solid var(--grayBg);padding:9px 0;}
+  .relconfrow.excluido{opacity:.5;}
+  .relconfmain{display:flex;align-items:center;gap:9px;}
+  .relconfcheck{
+    width:18px;height:18px;border-radius:5px;border:1.5px solid var(--line);background:#fff;
+    flex-shrink:0;padding:0;cursor:pointer;
+  }
+  .relconfcheck.on{background:var(--navy2);border-color:var(--navy2);position:relative;}
+  .relconfcheck.on::after{content:"✓";position:absolute;inset:0;color:#fff;font-size:11px;line-height:16px;}
+  .relconfnome{flex:1;font-size:12.5px;font-weight:600;color:var(--txt);}
+  .relconfval{font-size:12.5px;font-weight:800;color:var(--navy2);white-space:nowrap;}
+  .relconfdetalhar{
+    background:var(--grayBg);border:none;border-radius:6px;padding:5px 8px;
+    font-size:9.5px;color:var(--txt2);font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .relconfsubs{padding-left:27px;border-left:2px solid var(--grayBg);margin:8px 0 0 9px;}
+  .relconfsubrow{display:flex;justify-content:space-between;gap:8px;padding:4px 0;}
+  .relconfsubrow .relconfnome{font-size:11.5px;font-weight:500;color:var(--txt2);}
+  .relconfsubrow .relconfval{font-size:11.5px;}
 
   /* ===== Relatório semanal de metas — só existe pra impressão ===== */
   #relatorioSemanalWrap{display:none;}
@@ -531,6 +552,17 @@
     <div class="confirmbtns">
       <button class="confirmbtn cancel" id="medidoCancel">Cancelar</button>
       <button class="confirmbtn ok" id="medidoSalvar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirmwrap" id="relatorioConfirmWrap">
+  <div class="confirmbox relatorioconfirmbox">
+    <div class="medidotitle">Revisar antes de imprimir</div>
+    <div id="relatorioConfirmLista"></div>
+    <div class="confirmbtns">
+      <button class="confirmbtn cancel" id="relatorioConfirmCancelar">Cancelar</button>
+      <button class="confirmbtn ok" id="relatorioConfirmGerar">Gerar</button>
     </div>
   </div>
 </div>
@@ -1709,27 +1741,93 @@ function semanasNoMes(mesRef){
   return Math.ceil(diasNoMes / 7);
 }
 
-function gerarRelatorioSemanal(){
-  const info = EMPREENDIMENTOS[currentEmp];
+let relatorioConfig = {};      // { codigoMacro: { incluido, detalhado } }
+let relatorioDadosAtual = [];  // dados já calculados (mesmo GARGALO de antes), cacheados enquanto o modal fica aberto
+
+function abrirConfirmacaoRelatorio(){
   const hoje = new Date();
   const mesAtual = mesKey(hoje);
   const metasEmp = METASSUB_HIST[currentEmp] || {};
   const nSemanas = semanasNoMes(mesAtual);
 
-  // o valor da macro-etapa é o GARGALO — o menor valor entre as sub-etapas que
-  // têm meta pro mês, não a soma delas (são tarefas em sequência dentro da
-  // mesma etapa, então quem anda mais devagar é quem trava o ritmo de todas)
-  const linhas = STAGES.map(st=>{
+  relatorioConfig = {};
+  relatorioDadosAtual = STAGES.map(st=>{
     const folhas = subEtapasFlat(st);
+    const subsComMeta = [];
     const valores = [];
     folhas.forEach(f=>{
       const v = (metasEmp[f.codigo] || {})[mesAtual];
-      if(v) valores.push(Number(v));
+      if(v){
+        valores.push(Number(v));
+        subsComMeta.push({ nome: f.nome, porSemana: Math.ceil(Number(v)/nSemanas) });
+      }
     });
-    if(valores.length === 0) return { nome: st.nome, porSemana: 0 };
-    const menorValor = Math.min(...valores);
-    return { nome: st.nome, porSemana: Math.ceil(menorValor / nSemanas) };
-  }).filter(l => l.porSemana > 0);
+    if(valores.length === 0) return null;
+    relatorioConfig[st.codigo] = { incluido: true, detalhado: false };
+    return { codigo: st.codigo, nome: st.nome, porSemana: Math.ceil(Math.min(...valores)/nSemanas), subs: subsComMeta };
+  }).filter(Boolean);
+
+  renderConfirmacaoRelatorio();
+  document.getElementById("relatorioConfirmWrap").classList.add("show");
+}
+
+function renderConfirmacaoRelatorio(){
+  const lista = document.getElementById("relatorioConfirmLista");
+  if(relatorioDadosAtual.length === 0){
+    lista.innerHTML = `<div class="macroempty">Nenhuma meta cadastrada pra esse mês.</div>`;
+    return;
+  }
+  lista.innerHTML = relatorioDadosAtual.map(l=>{
+    const cfg = relatorioConfig[l.codigo];
+    return `
+      <div class="relconfrow ${cfg.incluido ? '' : 'excluido'}" data-codigo="${l.codigo}">
+        <div class="relconfmain">
+          <button class="relconfcheck ${cfg.incluido?'on':''}" data-acao="toggle-incluir"></button>
+          <span class="relconfnome">${l.nome}</span>
+          ${!cfg.detalhado ? `<span class="relconfval">${l.porSemana} casas</span>` : ""}
+          <button class="relconfdetalhar" data-acao="toggle-detalhar">${cfg.detalhado ? "Resumir ▾" : "Detalhar ▸"}</button>
+        </div>
+        ${cfg.detalhado ? `
+          <div class="relconfsubs">
+            ${l.subs.map(s=>`
+              <div class="relconfsubrow">
+                <span class="relconfnome">${s.nome}</span>
+                <span class="relconfval">${s.porSemana} casas</span>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }).join("");
+}
+document.getElementById("relatorioConfirmLista").addEventListener("click", (e)=>{
+  const row = e.target.closest(".relconfrow");
+  if(!row) return;
+  const codigo = row.dataset.codigo;
+  const acao = e.target.dataset.acao;
+  if(acao === "toggle-incluir") relatorioConfig[codigo].incluido = !relatorioConfig[codigo].incluido;
+  else if(acao === "toggle-detalhar") relatorioConfig[codigo].detalhado = !relatorioConfig[codigo].detalhado;
+  else return;
+  renderConfirmacaoRelatorio();
+});
+document.getElementById("relatorioConfirmCancelar").addEventListener("click", ()=>{
+  document.getElementById("relatorioConfirmWrap").classList.remove("show");
+});
+document.getElementById("relatorioConfirmWrap").addEventListener("click", (e)=>{
+  if(e.target.id === "relatorioConfirmWrap") e.currentTarget.classList.remove("show");
+});
+document.getElementById("relatorioConfirmGerar").addEventListener("click", ()=>{
+  document.getElementById("relatorioConfirmWrap").classList.remove("show");
+  gerarRelatorioSemanalFinal();
+});
+
+function gerarRelatorioSemanalFinal(){
+  const info = EMPREENDIMENTOS[currentEmp];
+  const hoje = new Date();
+  const mesAtual = mesKey(hoje);
+  const nSemanas = semanasNoMes(mesAtual);
+  const linhas = relatorioDadosAtual.filter(l => relatorioConfig[l.codigo].incluido);
 
   const container = document.getElementById("relatorioSemanalWrap");
   container.innerHTML = `
@@ -1744,11 +1842,16 @@ function gerarRelatorioSemanal(){
       </div>
     </div>
     ${linhas.length === 0
-      ? `<p style="color:#5c6377;font-size:13px;">Nenhuma meta cadastrada para ${mesLabel(hoje)}.</p>`
+      ? `<p style="color:#5c6377;font-size:13px;">Nenhuma etapa selecionada.</p>`
       : `<table class="reltable">
           <thead><tr><th>Etapa</th><th class="reln">Meta da semana</th></tr></thead>
           <tbody>
-            ${linhas.map(l => `<tr><td>${l.nome}</td><td class="reln">${l.porSemana} casas</td></tr>`).join("")}
+            ${linhas.map(l=>{
+              const cfg = relatorioConfig[l.codigo];
+              if(!cfg.detalhado) return `<tr><td>${l.nome}</td><td class="reln">${l.porSemana} casas</td></tr>`;
+              return `<tr><td colspan="2" style="font-weight:700;padding-top:14px;border-bottom:none;">${l.nome}</td></tr>` +
+                l.subs.map(s=>`<tr><td style="padding-left:22px;color:#5c6377;">${s.nome}</td><td class="reln">${s.porSemana} casas</td></tr>`).join("");
+            }).join("")}
           </tbody>
         </table>`
     }
@@ -2174,7 +2277,7 @@ document.getElementById("dashWrap").addEventListener("click", (e)=>{
   const btnMetasEdit = e.target.closest("#metasEditBtn");
   if(btnMetasEdit){ metasSubEditMode = true; renderMetasTab(); return; }
   const btnMetasRelatorio = e.target.closest("#metasRelatorioBtn");
-  if(btnMetasRelatorio){ gerarRelatorioSemanal(); return; }
+  if(btnMetasRelatorio){ abrirConfirmacaoRelatorio(); return; }
   const btnMetasOk = e.target.closest("#metasOkBtn");
   if(btnMetasOk){ salvarMetasSub(); return; }
   const row = e.target.closest(".macrorow");
