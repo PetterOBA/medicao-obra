@@ -390,9 +390,12 @@
     font-size:9.5px;color:var(--txt2);font-weight:700;cursor:pointer;white-space:nowrap;
   }
   .relconfsubs{padding-left:27px;border-left:2px solid var(--grayBg);margin:8px 0 0 9px;}
-  .relconfsubrow{display:flex;justify-content:space-between;gap:8px;padding:4px 0;}
+  .relconfsubrow{display:flex;align-items:center;gap:8px;padding:4px 0;}
+  .relconfsubrow.excluido{opacity:.5;}
   .relconfsubrow .relconfnome{font-size:11.5px;font-weight:500;color:var(--txt2);}
   .relconfsubrow .relconfval{font-size:11.5px;}
+  .relconfchecksub{width:15px;height:15px;border-radius:4px;}
+  .relconfchecksub.on::after{font-size:9px;line-height:13px;}
 
   /* ===== Relatório semanal de metas — só existe pra impressão ===== */
   #relatorioSemanalWrap{display:none;}
@@ -1759,11 +1762,13 @@ function abrirConfirmacaoRelatorio(){
       const v = (metasEmp[f.codigo] || {})[mesAtual];
       if(v){
         valores.push(Number(v));
-        subsComMeta.push({ nome: f.nome, porSemana: Math.ceil(Number(v)/nSemanas) });
+        subsComMeta.push({ codigo: f.codigo, nome: f.nome, porSemana: Math.ceil(Number(v)/nSemanas) });
       }
     });
     if(valores.length === 0) return null;
-    relatorioConfig[st.codigo] = { incluido: true, detalhado: false };
+    const subsIncluidos = {};
+    subsComMeta.forEach(s => subsIncluidos[s.codigo] = true); // começa tudo marcado
+    relatorioConfig[st.codigo] = { incluido: true, detalhado: false, subsIncluidos };
     return { codigo: st.codigo, nome: st.nome, porSemana: Math.ceil(Math.min(...valores)/nSemanas), subs: subsComMeta };
   }).filter(Boolean);
 
@@ -1790,7 +1795,8 @@ function renderConfirmacaoRelatorio(){
         ${cfg.detalhado ? `
           <div class="relconfsubs">
             ${l.subs.map(s=>`
-              <div class="relconfsubrow">
+              <div class="relconfsubrow ${cfg.subsIncluidos[s.codigo] ? '' : 'excluido'}" data-subcodigo="${s.codigo}">
+                <button class="relconfcheck relconfchecksub ${cfg.subsIncluidos[s.codigo]?'on':''}" data-acao="toggle-incluir-sub"></button>
                 <span class="relconfnome">${s.nome}</span>
                 <span class="relconfval">${s.porSemana} casas</span>
               </div>
@@ -1806,7 +1812,12 @@ document.getElementById("relatorioConfirmLista").addEventListener("click", (e)=>
   if(!row) return;
   const codigo = row.dataset.codigo;
   const acao = e.target.dataset.acao;
-  if(acao === "toggle-incluir") relatorioConfig[codigo].incluido = !relatorioConfig[codigo].incluido;
+  if(acao === "toggle-incluir-sub"){
+    const subRow = e.target.closest(".relconfsubrow");
+    const subCodigo = subRow.dataset.subcodigo;
+    relatorioConfig[codigo].subsIncluidos[subCodigo] = !relatorioConfig[codigo].subsIncluidos[subCodigo];
+  }
+  else if(acao === "toggle-incluir") relatorioConfig[codigo].incluido = !relatorioConfig[codigo].incluido;
   else if(acao === "toggle-detalhar") relatorioConfig[codigo].detalhado = !relatorioConfig[codigo].detalhado;
   else return;
   renderConfirmacaoRelatorio();
@@ -1849,8 +1860,10 @@ function gerarRelatorioSemanalFinal(){
             ${linhas.map(l=>{
               const cfg = relatorioConfig[l.codigo];
               if(!cfg.detalhado) return `<tr><td>${l.nome}</td><td class="reln">${l.porSemana} casas</td></tr>`;
+              const subsMarcadas = l.subs.filter(s => cfg.subsIncluidos[s.codigo]);
+              if(subsMarcadas.length === 0) return "";
               return `<tr><td colspan="2" style="font-weight:700;padding-top:14px;border-bottom:none;">${l.nome}</td></tr>` +
-                l.subs.map(s=>`<tr><td style="padding-left:22px;color:#5c6377;">${s.nome}</td><td class="reln">${s.porSemana} casas</td></tr>`).join("");
+                subsMarcadas.map(s=>`<tr><td style="padding-left:22px;color:#5c6377;">${s.nome}</td><td class="reln">${s.porSemana} casas</td></tr>`).join("");
             }).join("")}
           </tbody>
         </table>`
