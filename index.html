@@ -224,6 +224,26 @@
   .metasreadrow span{font-size:11px;color:var(--txt);}
   .metasreadrow span:not(:first-child){text-align:center;font-weight:700;color:var(--txt2);}
   .ganttperiodo{display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;}
+  .comprow{display:flex;gap:10px;}
+  .compperiodo{flex:1;background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 10px;}
+  .compperiodotit{font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;margin-bottom:5px;}
+  .compperiodo input{width:100%;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:11px;font-family:inherit;margin-bottom:4px;}
+  .compperiodo input:last-child{margin-bottom:0;}
+  .compheadrow,.comprowresult{display:grid;grid-template-columns:1fr 62px 62px 66px;gap:4px;align-items:center;padding:7px 2px;}
+  .compheadrow{font-size:9px;color:var(--txt3);font-weight:700;text-transform:uppercase;border-bottom:2px solid var(--line);text-align:right;}
+  .compheadrow span:first-child{text-align:left;}
+  .comprowresult{border-bottom:1px solid var(--grayBg);font-size:11.5px;color:var(--txt2);text-align:right;}
+  .compnome{text-align:left;color:var(--txt);font-weight:600;font-size:12px;}
+  .compup{color:var(--green);font-weight:700;}
+  .compdown{color:var(--danger);font-weight:700;}
+  .compmacroblock{margin-bottom:1px;}
+  .comprowmacro{cursor:pointer;}
+  .comprowmacro .chevicon{display:inline-block;font-size:9px;color:var(--txt3);transition:transform .15s;margin-right:5px;}
+  .compmacroblock.open .comprowmacro .chevicon{transform:rotate(90deg);}
+  .compsubwrap{display:none;padding-left:8px;border-left:2px solid var(--grayBg);margin-left:2px;}
+  .compmacroblock.open .compsubwrap{display:block;}
+  .comprowsub{font-size:11px;color:var(--txt3);padding:6px 2px;}
+  .compnomesub{font-weight:400;font-size:11px;color:var(--txt2);}
   .ganttperiodo label{font-size:9.5px;color:var(--txt3);text-transform:uppercase;display:block;margin-bottom:3px;}
   .ganttperiodo input{border:1px solid var(--line);border-radius:8px;padding:7px 8px;font-size:12px;font-family:inherit;}
   .ganttscroll{overflow-x:auto;padding-bottom:6px;}
@@ -2090,6 +2110,7 @@ function salvarMetasSub(){
 
 /* ======================= ATIVIDADE (GANTT SEMANAL) ======================= */
 let ganttInicio = null, ganttFim = null; // "YYYY-MM-DD" — período visível, escolhido pela pessoa
+let compInicioA = null, compFimA = null, compInicioB = null, compFimB = null; // comparativo de períodos
 // casa decorada: já vem pronta fora da ordem normal da obra, então não conta
 // pra decidir quando uma etapa "começou" (senão distorceria pra trás todo mundo).
 // Continua aparecendo normal nas células de atividade — só fica de fora dessa conta específica.
@@ -2179,6 +2200,33 @@ function dataFimEtapa(emp, codigos){
 }
 // dentroBarra = a semana cai entre o início real e o fim (ou hoje, se ainda
 // não fechou) — fora disso a célula fica sempre vazia, sem exceção
+// data em que UMA casa específica fechou TODOS os códigos dados (pra uma
+// sub-etapa sozinha, é só a data de conclusão dela mesma). Null se a casa
+// ainda não concluiu todos os códigos da lista.
+function dataFimEtapaPorCasa(emp, u, codigos){
+  let maior = null;
+  for(const cod of codigos){
+    if(getStatus(emp,u,cod) !== "concluido") return null;
+    const dc = getDataConclusao(emp,u,cod);
+    if(dc && (maior===null || dc>maior)) maior = dc;
+  }
+  return maior;
+}
+// quantas casas concluíram esses códigos (todos eles) dentro do período
+// [inicio,fim] — pra uma macro-etapa, só conta a casa quando ela fechou TODAS
+// as sub-etapas daquela macro e a última delas caiu dentro do período; pra
+// uma sub-etapa sozinha, conta direto pela data de conclusão dela
+function casasNoPeriodo(emp, codigos, inicioStr, fimStr){
+  const info = EMPREENDIMENTOS[emp];
+  let n = 0;
+  for(let i=1;i<=info.total;i++){
+    const u = String(i);
+    const dc = dataFimEtapaPorCasa(emp, u, codigos);
+    if(dc && dc>=inicioStr && dc<=fimStr) n++;
+  }
+  return n;
+}
+
 function corCelulaGantt(valor, max, dentroBarra){
   if(!dentroBarra) return "#eef0f4";
   const intensidade = Math.min(1, valor/max);
@@ -2188,8 +2236,69 @@ function corCelulaGantt(valor, max, dentroBarra){
   return `rgba(12,31,160,${(0.32+0.68*intensidade).toFixed(2)})`;
 }
 
+// calcula o comparativo de todas as macro-etapas (e suas sub-etapas) entre
+// os dois períodos, em número de CASAS que concluíram — só traz quem teve
+// alguma casa concluída em pelo menos um dos dois períodos
+function calcularComparativoPeriodos(){
+  return STAGES.map(st=>{
+    const codigos = subEtapasFlat(st).map(f=>f.codigo);
+    const casasA = casasNoPeriodo(currentEmp, codigos, compInicioA, compFimA);
+    const casasB = casasNoPeriodo(currentEmp, codigos, compInicioB, compFimB);
+    const subs = subEtapasFlat(st).map(f=>{
+      const subA = casasNoPeriodo(currentEmp, [f.codigo], compInicioA, compFimA);
+      const subB = casasNoPeriodo(currentEmp, [f.codigo], compInicioB, compFimB);
+      return { nome: f.nome, codigo: f.codigo, casasA: subA, casasB: subB, delta: subB - subA };
+    }).filter(s => s.casasA > 0 || s.casasB > 0);
+    return { nome: st.nome, codigo: st.codigo, casasA, casasB, delta: casasB - casasA, subs };
+  }).filter(l => l.casasA > 0 || l.casasB > 0 || l.subs.length > 0);
+}
+function renderComparativoResultado(){
+  const linhas = calcularComparativoPeriodos();
+  const el = document.getElementById("compResultado");
+  if(!el) return;
+  el.innerHTML = linhas.length === 0
+    ? `<div class="macroempty">Nenhuma casa concluída nos dois períodos.</div>`
+    : `
+      <div class="compheadrow"><span></span><span>Período A</span><span>Período B</span><span>Cresc.</span></div>
+      ${linhas.map(l=>`
+        <div class="compmacroblock" data-macro="${l.codigo}">
+          <div class="comprowresult comprowmacro">
+            <span class="compnome"><span class="chevicon">▸</span>${l.nome}</span>
+            <span>${l.casasA}</span>
+            <span>${l.casasB}</span>
+            <span class="${l.delta>=0?'compup':'compdown'}">${l.delta>=0?'▲':'▼'} ${Math.abs(l.delta)}</span>
+          </div>
+          <div class="compsubwrap">
+            ${l.subs.length === 0
+              ? `<div class="macroempty" style="padding:6px 2px;">Nenhuma sub-etapa concluída nos dois períodos.</div>`
+              : l.subs.map(s=>`
+                <div class="comprowresult comprowsub">
+                  <span class="compnome compnomesub">${s.nome}</span>
+                  <span>${s.casasA}</span>
+                  <span>${s.casasB}</span>
+                  <span class="${s.delta>=0?'compup':'compdown'}">${s.delta>=0?'▲':'▼'} ${Math.abs(s.delta)}</span>
+                </div>
+              `).join("")}
+          </div>
+        </div>
+      `).join("")}
+    `;
+}
+
 function renderGanttTab(){
   const wrap = document.getElementById("dashWrap");
+  // padrão na primeira vez: Período A = semana passada inteira, Período B =
+  // semana atual até hoje — dá pra trocar livremente depois
+  if(!compFimB){
+    const hoje = new Date();
+    const segAtual = segundaFeira(hoje);
+    compInicioB = formatoYMD(segAtual);
+    compFimB = formatoYMD(hoje);
+    const segAnterior = new Date(segAtual); segAnterior.setDate(segAnterior.getDate()-7);
+    const domAnterior = new Date(segAnterior); domAnterior.setDate(domAnterior.getDate()+6);
+    compInicioA = formatoYMD(segAnterior);
+    compFimA = formatoYMD(domAnterior);
+  }
   if(!ganttFim){
     const hoje = new Date();
     ganttFim = formatoYMD(hoje);
@@ -2226,6 +2335,24 @@ function renderGanttTab(){
   }
 
   wrap.innerHTML = `
+    <div class="dashsection">
+      <div class="dashsectiontitle">Comparar Períodos</div>
+      <div class="comprow">
+        <div class="compperiodo">
+          <div class="compperiodotit">Período A</div>
+          <input type="date" id="compIniA" value="${compInicioA}">
+          <input type="date" id="compFimA" value="${compFimA}">
+        </div>
+        <div class="compperiodo">
+          <div class="compperiodotit">Período B</div>
+          <input type="date" id="compIniB" value="${compInicioB}">
+          <input type="date" id="compFimB" value="${compFimB}">
+        </div>
+      </div>
+      <button class="metasokbtn" id="compAplicarBtn" style="width:100%;margin-top:8px;">Comparar</button>
+      <div id="compResultado"></div>
+    </div>
+
     <div class="dashsection">
       <div class="ganttperiodo">
         <div><label>De</label><input type="date" id="ganttDataIni" value="${ganttInicio}"></div>
@@ -2270,8 +2397,29 @@ function renderGanttTab(){
       </div>
     </div>
   `;
+  renderComparativoResultado();
 }
 document.getElementById("dashWrap").addEventListener("click", (e)=>{
+  const btnComparar = e.target.closest("#compAplicarBtn");
+  if(btnComparar){
+    const iniA = document.getElementById("compIniA").value;
+    const fimA = document.getElementById("compFimA").value;
+    const iniB = document.getElementById("compIniB").value;
+    const fimB = document.getElementById("compFimB").value;
+    if(!iniA || !fimA || !iniB || !fimB || iniA > fimA || iniB > fimB){
+      toast("Período inválido", true);
+      return;
+    }
+    compInicioA = iniA; compFimA = fimA; compInicioB = iniB; compFimB = fimB;
+    renderComparativoResultado();
+    return;
+  }
+  const compRowMacro = e.target.closest(".comprowmacro");
+  if(compRowMacro){
+    const block = compRowMacro.closest(".compmacroblock");
+    if(block) block.classList.toggle("open");
+    return;
+  }
   const btnAplicar = e.target.closest("#ganttAplicarBtn");
   if(btnAplicar){
     const ini = document.getElementById("ganttDataIni").value;
